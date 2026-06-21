@@ -40,6 +40,7 @@ export interface ITableOfContentsWebPartProps {
   enableStickyMode: boolean;
   hideInMobileView: boolean;
   listStyle: string;
+  fontSize: string;
 
 }
 
@@ -94,6 +95,7 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
 
         hideTitle: this.properties.hideTitle,
         titleText: this.properties.titleText,
+		fontSize: this.properties.fontSize || '15px',
 
         searchText: this.properties.searchText,
         searchMarkdown: this.properties.searchMarkdown,
@@ -262,7 +264,16 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
                   label: strings.hideInMobileViewLabel
                 })
               ]
-            }
+            },
+			{
+			  groupFields: [
+                PropertyPaneTextField('fontSize', {
+				  label: 'Schriftgröße (z. B. 16px, 14px oder 1.2rem)',
+				  description: 'Gib die gewünschte Größe mit Einheit an.',
+				  value: '15px' // Standardwert, falls nichts eingegeben wurde
+				})
+              ]
+			}
           ]
         }
       ]

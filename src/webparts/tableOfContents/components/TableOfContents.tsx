@@ -315,9 +315,18 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
         }
       }
 
+      // Hier wird die Schriftgröße aus den Props ausgelesen
+      const customFontSize = this.props.fontSize || '15px';
+
       return (
-        <li key={index}>
-          <a onClick={this.scrollToHeader(link.element)} href={'#' + link.element.id}>{linkText}</a>
+        <li key={index} style={{ fontSize: customFontSize }}>
+          <a 
+            onClick={this.scrollToHeader(link.element)} 
+            href={'#' + link.element.id}
+            style={{ fontSize: customFontSize }} // Übernimmt die Schriftgröße direkt für den Link
+          >
+            {linkText}
+          </a>
           {link.childNodes.length > 0 ? (<ul style={{ listStyleType: listStyle }}>{this.renderLinks(link.childNodes, listStyle)}</ul>) : ''}
         </li>
       );

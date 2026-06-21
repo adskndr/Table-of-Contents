@@ -4,6 +4,7 @@ export interface ITableOfContentsProps {
 
   hideTitle: boolean;
   titleText: string;
+  fontSize: string;
 
   searchText: boolean;
   searchMarkdown: boolean;
