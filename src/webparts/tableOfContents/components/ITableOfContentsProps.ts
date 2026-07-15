@@ -30,4 +30,6 @@ export interface ITableOfContentsProps {
   listStyle: string;
 
   isEditMode: boolean;
+
+  layoutMode?: string;
 }
