@@ -2,9 +2,9 @@ name: Build SPFx Package
 
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    branches:
+      - main
+      - 'new-layout'
   workflow_dispatch: {}
 
 jobs:
