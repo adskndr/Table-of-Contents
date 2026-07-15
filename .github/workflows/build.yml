@@ -36,5 +36,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: table-of-contents-sppkg
-          path: sharepoint/solution/*.sppkg
+          path: '**/*.sppkg'
           if-no-files-found: error
