@@ -41,6 +41,7 @@ export interface ITableOfContentsWebPartProps {
   hideInMobileView: boolean;
   listStyle: string;
   fontSize: string;
+  layoutMode: string;
 
 }
 
