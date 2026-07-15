@@ -55,4 +55,5 @@ build.rig.getTasks = function () {
 
   return result;
 };
+build.addSuppression(/Warning - lint.*/);
 build.initialize(gulp);
