@@ -59,6 +59,7 @@ export interface ITableOfContentsWebPartProps {
   fontSize: string;
   layoutMode: string;
   allowCardReordering: boolean;
+  excludeSelectors: string;
 
   h1UseCustomColors: boolean;
   h1BackgroundColor: string;
@@ -99,8 +100,7 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
     this._themeProvider = this.context.serviceScope.consume(ThemeProvider.serviceKey);
     // If it exists, get the theme variant
     this._themeVariant = this._themeProvider.tryGetTheme();
-    this.setCSSVariables(this._themeVariant.semanticColors);
-    // Register a handler to be notified if the theme variant changes
+    this.setCSSVariables(this._themeVariant);
     this._themeProvider.themeChangedEvent.add(this, this._handleThemeChangedEvent);
     // return super.onInit()
     return super.onInit().then(_ => {
@@ -160,12 +160,19 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
     });
   }
 
-  private setCSSVariables(theming: any): any {
-    if (!theming) { return null; }
-    let themingKeys = Object.keys(theming);
-    if (themingKeys !== null) {
-      themingKeys.forEach(key => {
-        this.domElement.style.setProperty(`--${key}`, theming[key]);
+  private setCSSVariables(theme: IReadonlyTheme): void {
+    if (!theme) { return; }
+    // Colors (as before): drives text/background colors used throughout the webpart.
+    if (theme.semanticColors) {
+      Object.keys(theme.semanticColors).forEach(key => {
+        this.domElement.style.setProperty(`--${key}`, (theme.semanticColors as { [k: string]: string })[key]);
+      });
+    }
+    // Effects: corner rounding and shadow/elevation, so the "cards" layout picks up the exact
+    // rounding and depth the current SharePoint theme uses elsewhere on the page, not a hardcoded value.
+    if (theme.effects) {
+      Object.keys(theme.effects).forEach(key => {
+        this.domElement.style.setProperty(`--effect-${key}`, (theme.effects as { [k: string]: string })[key]);
       });
     }
   }
@@ -177,7 +184,7 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
  */
   private _handleThemeChangedEvent(args: ThemeChangedEventArgs): void {
     this._themeVariant = args.theme;
-    this.setCSSVariables(this._themeVariant.semanticColors);
+    this.setCSSVariables(this._themeVariant);
     this.render();
   }
 
@@ -215,6 +222,7 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
 
         layoutMode: this.properties.layoutMode || 'list',
         allowCardReordering: this.properties.allowCardReordering !== false,
+        excludeSelectors: this.properties.excludeSelectors || '',
         levelStyles: this.getLevelStyles(),
       }
     );
@@ -378,6 +386,19 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
                 }),
                 PropertyPaneToggle('hideInMobileView', {
                   label: strings.hideInMobileViewLabel
+                })
+              ]
+            },
+            {
+              groupFields: [
+                PropertyPaneLabel('excludeSelectorsLabel', {
+                  text: 'Bereiche ausschliessen'
+                }),
+                PropertyPaneTextField('excludeSelectors', {
+                  label: 'CSS-Selektor(en) (mehrere durch Komma trennen)',
+                  description: 'Überschriften innerhalb dieser Bereiche werden ignoriert - z. B. um Überschriften aus einem Organigramm- oder anderen Webpart auf derselben Seite auszuschliessen. ' +
+                    'Rechtsklick auf den betroffenen Bereich im Browser → "Untersuchen", dort die passende Klasse (z. B. ".orgChartWebPart") kopieren.',
+                  value: this.properties.excludeSelectors || ''
                 })
               ]
             },

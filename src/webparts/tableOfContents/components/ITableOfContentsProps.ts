@@ -60,4 +60,10 @@ export interface ITableOfContentsProps {
    * The custom order is remembered per browser (localStorage), not shared between visitors.
    */
   allowCardReordering: boolean;
+  /**
+   * Comma-separated list of CSS selectors. Any heading found inside an element matching one of
+   * these selectors is excluded from the table of contents (e.g. to skip headings rendered by
+   * another webpart on the page, such as an org chart).
+   */
+  excludeSelectors: string;
 }

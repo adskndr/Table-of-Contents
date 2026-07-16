@@ -342,6 +342,34 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   }
 
   /**
+   * Filters out headers that sit inside an element matching one of the admin-configured "exclude"
+   * CSS selectors (property pane field "excludeSelectors", comma-separated). Useful to keep headings
+   * that live inside another webpart on the page - e.g. an org chart webpart that renders its own
+   * headings for node captions - out of this table of contents.
+   * @param element
+   */
+  private filterExcludedSelectors = (element: HTMLElement): boolean => {
+    const raw = this.props.excludeSelectors;
+    if (!raw) {
+      return true;
+    }
+
+    const selectors = raw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+
+    for (const selector of selectors) {
+      try {
+        if (element.closest(selector)) {
+          return false;
+        }
+      } catch (e) {
+        // Invalid selector entered by the admin - ignore it rather than breaking the whole ToC.
+      }
+    }
+
+    return true;
+  }
+
+  /**
    * Returns a click handler that scrolls a page to the specified element.
    */
   private scrollToHeader = (target: HTMLElement) => {
@@ -776,7 +804,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
 
     return {
       cardStyle: {
-        backgroundColor: isTopLevel ? 'var(--white, #ffffff)' : 'var(--neutralLighterAlt, #faf9f8)',
+        backgroundColor: isTopLevel ? 'var(--bodyBackground, #faf9f8)' : 'var(--neutralLighterAlt, #faf9f8)',
         color: 'var(--neutralPrimary, #201f1e)',
         borderLeftColor: 'var(--themePrimary)'
       },
@@ -939,7 +967,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     // get headers, then filter out empty and headers from <aside> tags
     const listStyle = escape(this.props.listStyle) === "default" ? "" : this.props.listStyle;
     const querySelector = this.getQuerySelector(this.props);
-    const headers = this.getHtmlElements(querySelector).filter(this.filterEmpty).filter(this.filterAside).filter(this.filterTocIgnore).filter(this.filterStyleDisplayNone);
+    const headers = this.getHtmlElements(querySelector).filter(this.filterEmpty).filter(this.filterAside).filter(this.filterTocIgnore).filter(this.filterStyleDisplayNone).filter(this.filterExcludedSelectors);
     // create a list of links from headers
     const links = this.getLinks(headers);
 
