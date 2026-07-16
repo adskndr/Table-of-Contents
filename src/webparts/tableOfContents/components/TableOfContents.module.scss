@@ -116,4 +116,93 @@
   .tabPanel {
     padding-left: 4px;
   }
+
+  // Cards layout
+  .cardsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    align-items: start;
+  }
+  .card {
+    background: var(--white, #fff);
+    border-radius: 8px;
+    border-left: 4px solid var(--themePrimary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    padding: 14px 16px;
+  }
+  .card[draggable="true"] {
+    cursor: grab;
+  }
+  // Nested cards (H2 inside H1, H3 inside H2, ...): visually subordinate to their parent card
+  .cardsNestedGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+    padding-left: 14px;
+    border-left: 2px solid var(--neutralLighter);
+  }
+  .cardNested {
+    background: var(--neutralLighterAlt, #faf9f8);
+    border-radius: 6px;
+    border-left: 3px solid var(--themePrimary);
+    padding: 8px 12px;
+  }
+  .cardHeader {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none !important;
+    color: inherit !important;
+    &:hover {
+      text-decoration: none !important;
+    }
+  }
+  .cardIconBox {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: var(--neutralLighter);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--themePrimary);
+  }
+  .cardTitle {
+    flex: 1 1 auto;
+    font-weight: 600;
+  }
+  .cardBadge {
+    flex: 0 0 auto;
+    background: var(--neutralLighter);
+    color: var(--neutralSecondary);
+    border-radius: 999px;
+    padding: 2px 9px;
+    font-size: 0.75em;
+    font-weight: 600;
+  }
+  .cardToggle {
+    flex: 0 0 auto;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--neutralSecondary);
+  }
+  .cardChevron {
+    transition: transform 0.15s ease-in-out;
+  }
+  .cardChevronExpanded {
+    transition: transform 0.15s ease-in-out;
+    transform: rotate(180deg);
+  }
+  .cardDivider {
+    border-top: 1px solid var(--neutralLighter);
+    margin: 10px 0;
+  }
 }

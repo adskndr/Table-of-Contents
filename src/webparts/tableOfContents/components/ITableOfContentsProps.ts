@@ -55,4 +55,9 @@ export interface ITableOfContentsProps {
    * Styling (colors + icon) for each heading level, index 0 = Level 1 (H1) ... index 3 = Level 4 (H4).
    */
   levelStyles: ILevelStyle[];
+  /**
+   * Whether visitors can drag-and-drop reorder the top-level (H1) cards in the "cards" layout.
+   * The custom order is remembered per browser (localStorage), not shared between visitors.
+   */
+  allowCardReordering: boolean;
 }

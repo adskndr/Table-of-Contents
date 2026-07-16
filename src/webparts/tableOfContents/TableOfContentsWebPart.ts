@@ -58,6 +58,7 @@ export interface ITableOfContentsWebPartProps {
   listStyle: string;
   fontSize: string;
   layoutMode: string;
+  allowCardReordering: boolean;
 
   h1UseCustomColors: boolean;
   h1BackgroundColor: string;
@@ -109,6 +110,9 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
       }
       if (this.properties.layoutMode === undefined) {
         this.properties.layoutMode = 'list';
+      }
+      if (this.properties.allowCardReordering === undefined) {
+        this.properties.allowCardReordering = true;
       }
       // Default styling for each level: follow the SharePoint design (no custom colors, no icon)
       // until the user explicitly opts in to custom colors/icons for that level.
@@ -210,6 +214,7 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
         isEditMode: this.displayMode == DisplayMode.Edit,
 
         layoutMode: this.properties.layoutMode || 'list',
+        allowCardReordering: this.properties.allowCardReordering !== false,
         levelStyles: this.getLevelStyles(),
       }
     );
@@ -328,12 +333,17 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
                   options: [
                     { key: 'list', text: 'Liste' },
                     { key: 'tiles', text: 'Kacheln' },
-                    { key: 'tabs', text: 'Tabs' }
+                    { key: 'tabs', text: 'Tabs' },
+                    { key: 'cards', text: 'Karten' }
                   ],
                   selectedKey: this.properties.layoutMode || 'list'
                 }),
                 PropertyPaneLabel('layoutModeDescription', {
-                  text: 'Bei Kacheln und Tabs werden Ebene 1 bis 4 (H1-H4) ineinander verschachtelt dargestellt.'
+                  text: 'Bei Kacheln, Tabs und Karten werden Ebene 1 bis 4 (H1-H4) ineinander verschachtelt dargestellt.'
+                }),
+                PropertyPaneToggle('allowCardReordering', {
+                  label: 'Karten (Ebene 1) per Drag & Drop verschiebbar',
+                  disabled: this.properties.layoutMode !== 'cards'
                 })
               ]
             },
@@ -376,7 +386,7 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
                 PropertyPaneTextField('fontSize', {
 				  label: 'Schriftgröße (z. B. 16px, 14px oder 1.2rem)',
 				  description: 'Gib die gewünschte Größe mit Einheit an.',
-				  value: '18px' // Standardwert, falls nichts eingegeben wurde
+				  value: '15px' // Standardwert, falls nichts eingegeben wurde
 				})
               ]
 			}
@@ -418,7 +428,7 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
     return {
       groupFields: [
         PropertyPaneLabel(`${prefix}Label`, {
-          text: `Ebene ${level} (H${level}) - Kacheln/Tabs`
+          text: `Ebene ${level} (H${level}) - Kacheln/Tabs/Karten`
         }),
         PropertyPaneToggle(`${prefix}UseCustomColors`, {
           label: 'Eigene Farben verwenden',
