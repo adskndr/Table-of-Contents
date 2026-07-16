@@ -666,6 +666,60 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   }
 
   /**
+   * Moves a top-level card up or down by one position. Provided as a touch- and keyboard-friendly
+   * alternative to native HTML5 drag-and-drop, which is not supported on touch devices.
+   * @param index current index of the card
+   * @param delta -1 to move up/left, +1 to move down/right
+   * @param orderedLinks the current (already ordered) list of top-level links
+   */
+  private moveCard = (index: number, delta: number, orderedLinks: Link[]) => {
+    return (event: React.SyntheticEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const targetIndex = index + delta;
+      if (targetIndex < 0 || targetIndex >= orderedLinks.length) {
+        return;
+      }
+
+      const reordered = orderedLinks.slice();
+      const [moved] = reordered.splice(index, 1);
+      reordered.splice(targetIndex, 0, moved);
+
+      const cardOrderKeys = reordered.map((link) => this.getLinkKey(link));
+      this.setState({ cardOrderKeys });
+      this.persistCardOrder(cardOrderKeys);
+    };
+  }
+
+  /**
+   * Small drag-handle glyph (six dots) shown on draggable top-level cards.
+   */
+  private renderDragHandle(): JSX.Element {
+    return (
+      <svg viewBox="0 0 16 16" width="12" height="16" aria-hidden="true" focusable="false">
+        <circle cx="5" cy="3" r="1.3" fill="currentColor" />
+        <circle cx="11" cy="3" r="1.3" fill="currentColor" />
+        <circle cx="5" cy="8" r="1.3" fill="currentColor" />
+        <circle cx="11" cy="8" r="1.3" fill="currentColor" />
+        <circle cx="5" cy="13" r="1.3" fill="currentColor" />
+        <circle cx="11" cy="13" r="1.3" fill="currentColor" />
+      </svg>
+    );
+  }
+
+  /**
+   * Small up/down chevron glyph used by the move-up/move-down buttons.
+   */
+  private renderMoveArrow(direction: 'up' | 'down'): JSX.Element {
+    const d = direction === 'up' ? 'M2 8l4-4 4 4' : 'M2 4l4 4 4-4';
+    return (
+      <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false">
+        <path d={d} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  /**
    * Small chevron icon indicating expand/collapse state of a card.
    */
   private renderChevron(isExpanded: boolean): JSX.Element {
@@ -693,6 +747,46 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
    * @param depth nesting depth: 0 = Level 1 (H1), 1 = Level 2 (H2), 2 = Level 3 (H3), 3 = Level 4 (H4)
    * @param path identifies this card's position in the hierarchy, used as a key into expandedPaths
    */
+  /**
+   * Computes the full colour set for a card at a given level: background, text, icon-box,
+   * badge and divider colours - all as one consistent, always-legible pair.
+   *
+   * - If the level is set to "eigene Farben" (custom colors), the whole card is filled with the
+   *   chosen background/text colour (same behaviour as the coloured Kacheln/Tabs chips).
+   * - Otherwise ("SharePoint-Design"), every colour comes from the site theme, using the same
+   *   token pairs SharePoint itself uses for a neutral card surface - these are guaranteed by
+   *   the theme to always be legible together, in both light and dark site themes.
+   */
+  private getCardChrome(levelStyle: ILevelStyle, isTopLevel: boolean): {
+    cardStyle: React.CSSProperties;
+    iconBoxStyle: React.CSSProperties;
+    badgeStyle: React.CSSProperties;
+    dividerStyle: React.CSSProperties;
+  } {
+    if (levelStyle.useCustomColors) {
+      const bg = levelStyle.backgroundColor || TableOfContents.defaultLevelStyle.backgroundColor;
+      const text = levelStyle.textColor || TableOfContents.defaultLevelStyle.textColor;
+      return {
+        cardStyle: { backgroundColor: bg, color: text, borderLeftColor: bg },
+        iconBoxStyle: { backgroundColor: 'rgba(255, 255, 255, 0.2)', color: text },
+        badgeStyle: { backgroundColor: 'rgba(255, 255, 255, 0.25)', color: text },
+        dividerStyle: { borderTopColor: 'rgba(255, 255, 255, 0.3)' }
+      };
+    }
+
+    return {
+      cardStyle: {
+        backgroundColor: isTopLevel ? 'var(--white, #ffffff)' : 'var(--neutralLighterAlt, #faf9f8)',
+        color: 'var(--neutralPrimary, #201f1e)',
+        borderLeftColor: 'var(--themePrimary)'
+      },
+      iconBoxStyle: { backgroundColor: 'var(--neutralLighter, #edebe9)', color: 'var(--themePrimary)' },
+      badgeStyle: { backgroundColor: 'var(--neutralLighter, #edebe9)', color: 'var(--neutralSecondary, #605e5c)' },
+      dividerStyle: { borderTopColor: 'var(--neutralLighter, #edebe9)' }
+    };
+  }
+
+
   private renderCards(links: Link[], listStyle: string, depth: number = 0, path: string = 'root'): JSX.Element {
     if (!links || links.length === 0) {
       return depth === 0 ? <div className={styles.cardsGrid} /> : null;
@@ -703,9 +797,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     const isTopLevel = depth === 0;
     const canDrag = isTopLevel && this.props.allowCardReordering;
     const containerClass = isTopLevel ? styles.cardsGrid : styles.cardsNestedGroup;
-    const accentColor = levelStyle.useCustomColors
-      ? (levelStyle.backgroundColor || TableOfContents.defaultLevelStyle.backgroundColor)
-      : 'var(--themePrimary)';
+    const chrome = this.getCardChrome(levelStyle, isTopLevel);
 
     return (
       <div className={containerClass}>
@@ -721,7 +813,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
             <div
               className={isTopLevel ? styles.card : styles.cardNested}
               key={linkText + index}
-              style={{ borderLeftColor: accentColor }}
+              style={chrome.cardStyle}
               draggable={canDrag}
               onDragStart={canDrag ? this.handleCardDragStart(index) : undefined}
               onDragOver={canDrag ? this.handleCardDragOver : undefined}
@@ -731,14 +823,42 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
                 className={styles.cardHeader}
                 href={'#' + link.element.id}
                 onClick={this.scrollToHeader(link.element)}
+                draggable={false}
               >
+                {canDrag ? (
+                  <span className={styles.cardDragHandle} aria-hidden="true">
+                    {this.renderDragHandle()}
+                  </span>
+                ) : null}
                 {icon ? (
-                  <span className={styles.cardIconBox}>
+                  <span className={styles.cardIconBox} style={chrome.iconBoxStyle}>
                     {icon}
                   </span>
                 ) : null}
                 <span className={styles.cardTitle}>{linkText}</span>
-                {descendantCount > 0 ? <span className={styles.cardBadge}>{descendantCount}</span> : null}
+                {descendantCount > 0 ? <span className={styles.cardBadge} style={chrome.badgeStyle}>{descendantCount}</span> : null}
+                {canDrag ? (
+                  <span className={styles.cardMoveControls}>
+                    <button
+                      type="button"
+                      className={styles.cardMoveButton}
+                      aria-label="Nach oben verschieben"
+                      disabled={index === 0}
+                      onClick={this.moveCard(index, -1, orderedLinks)}
+                    >
+                      {this.renderMoveArrow('up')}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.cardMoveButton}
+                      aria-label="Nach unten verschieben"
+                      disabled={index === orderedLinks.length - 1}
+                      onClick={this.moveCard(index, 1, orderedLinks)}
+                    >
+                      {this.renderMoveArrow('down')}
+                    </button>
+                  </span>
+                ) : null}
                 {hasChildren ? (
                   <button
                     type="button"
@@ -753,7 +873,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
               </a>
               {hasChildren && expanded ? (
                 <React.Fragment>
-                  <div className={styles.cardDivider} />
+                  <div className={styles.cardDivider} style={chrome.dividerStyle} />
                   {this.renderCards(link.childNodes, listStyle, depth + 1, cardPath)}
                 </React.Fragment>
               ) : null}

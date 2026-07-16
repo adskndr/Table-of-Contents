@@ -124,15 +124,21 @@
     gap: 16px;
     align-items: start;
   }
+  // Card chrome (background/text/icon colours) is computed in JS via getCardChrome() and applied
+  // as inline styles - either theme-paired tokens ("SharePoint design") or the level's custom
+  // colors, exactly like the Kacheln/Tabs chips. The rules below are layout-only; colors are
+  // deliberately NOT hardcoded here so the inline style (and thus the theme) always wins.
   .card {
-    background: var(--white, #fff);
     border-radius: 8px;
-    border-left: 4px solid var(--themePrimary);
+    border-left: 4px solid transparent;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
     padding: 14px 16px;
   }
   .card[draggable="true"] {
     cursor: grab;
+  }
+  .card[draggable="true"]:active {
+    cursor: grabbing;
   }
   // Nested cards (H2 inside H1, H3 inside H2, ...): visually subordinate to their parent card
   .cardsNestedGroup {
@@ -141,12 +147,11 @@
     gap: 8px;
     margin-top: 10px;
     padding-left: 14px;
-    border-left: 2px solid var(--neutralLighter);
+    border-left: 2px solid var(--neutralLighter, #edebe9);
   }
   .cardNested {
-    background: var(--neutralLighterAlt, #faf9f8);
     border-radius: 6px;
-    border-left: 3px solid var(--themePrimary);
+    border-left: 3px solid transparent;
     padding: 8px 12px;
   }
   .cardHeader {
@@ -158,17 +163,18 @@
     &:hover {
       text-decoration: none !important;
     }
+    &:visited {
+      color: inherit !important;
+    }
   }
   .cardIconBox {
     flex: 0 0 auto;
     width: 28px;
     height: 28px;
     border-radius: 6px;
-    background: var(--neutralLighter);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--themePrimary);
   }
   .cardTitle {
     flex: 1 1 auto;
@@ -176,8 +182,6 @@
   }
   .cardBadge {
     flex: 0 0 auto;
-    background: var(--neutralLighter);
-    color: var(--neutralSecondary);
     border-radius: 999px;
     padding: 2px 9px;
     font-size: 0.75em;
@@ -192,7 +196,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--neutralSecondary);
+    color: inherit;
+    opacity: 0.75;
   }
   .cardChevron {
     transition: transform 0.15s ease-in-out;
@@ -202,7 +207,44 @@
     transform: rotate(180deg);
   }
   .cardDivider {
-    border-top: 1px solid var(--neutralLighter);
+    border-top: 1px solid var(--neutralLighter, #edebe9);
     margin: 10px 0;
+  }
+
+  // Drag handle + up/down move buttons for reordering top-level (H1) cards.
+  // Buttons are provided in addition to native HTML5 drag-and-drop because that API
+  // does not work on touch devices (tablets/phones) - the buttons always work.
+  .cardMoveControls {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+  }
+  .cardMoveButton {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: inherit;
+    opacity: 0.75;
+    &:disabled {
+      opacity: 0.3;
+      cursor: default;
+    }
+  }
+  .cardDragHandle {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: inherit;
+    opacity: 0.5;
+    cursor: grab;
+    padding: 4px;
+    &:active {
+      cursor: grabbing;
+    }
   }
 }
