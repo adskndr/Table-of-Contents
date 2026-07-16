@@ -32,13 +32,14 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   private static h5Tag = "h5";
 
   /**
-   * Create a state for the history count. 
+   * Create a state for the history count.
    * This is required to make sure we go back to the correct page when the back to previous page link is clicked.
    */
   constructor(props: ITableOfContentsProps) {
     super(props);
     this.state = {
-      historyCount: -1
+      historyCount: -1,
+      activeTabIndex: 0
     };
   }
 
@@ -290,40 +291,62 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   }
 
   /**
+   * Extracts the display text for a link, falling back to the Permalink title if empty.
+   * @param link
+   */
+  private getLinkText(link: Link): string {
+    let linkText = link.element.innerText;
+    const regex = /title="Permalink for ([^"]+)"/;
+
+    if (linkText === "") {
+      if (link.element.firstElementChild.getAttribute('role') === 'link') {
+        const match = link.element.innerHTML.match(regex);
+        if (match && match.length >= 2) {
+          linkText = match[1];
+        }
+        else {
+          linkText = 'Error!';
+        }
+      }
+      else {
+        linkText = 'Error!';
+      }
+    }
+
+    return linkText;
+  }
+
+  /**
+   * Small decorative icon shown in front of tile/tab labels.
+   * Swap the <path> below for any other Fluent-style icon glyph if you'd like a different symbol.
+   */
+  private renderChipIcon(): JSX.Element {
+    return (
+      <svg className={styles.chipIcon} viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+        <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M1.7 8h12.6M8 1.7c1.8 1.7 1.8 11 0 12.6M8 1.7c-1.8 1.7-1.8 11 0 12.6" fill="none" stroke="currentColor" strokeWidth="1.1" />
+      </svg>
+    );
+  }
+
+  /**
    * Creates a list of components to display from a list of links.
    * @param links
    */
   private renderLinks(links: Link[], listStyle: string): JSX.Element[] {
     // For each link render a <li> element with a link. If the link has got childNodes, additionaly render <ul> with child links.
     const elements = links.map((link, index) => {
-      let linkText = link.element.innerText;
-      const regex = /title="Permalink for ([^"]+)"/;
-
-      // If linkText is empty, extract the text from the 'Permalink'
-      if (linkText === "") {
-        if (link.element.firstElementChild.getAttribute('role') === 'link') {
-          let match = link.element.innerHTML.match(regex);
-          if (match.length >= 2) {
-            linkText = match[1];
-          }
-          else {
-            linkText = 'Error!';
-          }
-        }
-        else {
-          linkText = 'Error!';
-        }
-      }
+      const linkText = this.getLinkText(link);
 
       // Hier wird die Schriftgröße aus den Props ausgelesen
       const customFontSize = this.props.fontSize || '15px';
 
       return (
         <li key={index} style={{ fontSize: customFontSize }}>
-          <a 
-            onClick={this.scrollToHeader(link.element)} 
+          <a
+            onClick={this.scrollToHeader(link.element)}
             href={'#' + link.element.id}
-            style={{ fontSize: customFontSize }} // Übernimmt die Schriftgröße direkt für den Link
+            style={{ fontSize: customFontSize }}
           >
             {linkText}
           </a>
@@ -333,6 +356,111 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     });
 
     return elements;
+  }
+
+  /**
+   * Renders top-level headers as a grid of rounded, coloured chip tiles.
+   * @param links
+   * @param listStyle
+   */
+  private renderTiles(links: Link[], listStyle: string): JSX.Element {
+    const customFontSize = this.props.fontSize || '15px';
+    const bgColor = this.props.tileBackgroundColor || '#0078D4';
+    const textColor = this.props.tileTextColor || '#FFFFFF';
+
+    if (!links || links.length === 0) {
+      return <div className={styles.tilesContainer} />;
+    }
+
+    return (
+      <div className={styles.tilesContainer}>
+        {links.map((link, index) => {
+          const linkText = this.getLinkText(link);
+
+          return (
+            <div className={styles.tile} key={index}>
+              <a
+                className={styles.tileChip}
+                onClick={this.scrollToHeader(link.element)}
+                href={'#' + link.element.id}
+                style={{ fontSize: customFontSize, backgroundColor: bgColor, color: textColor }}
+              >
+                {this.renderChipIcon()}
+                <span>{linkText}</span>
+              </a>
+              {link.childNodes.length > 0 ? (
+                <ul style={{ listStyleType: listStyle }} className={styles.tileChildList}>
+                  {this.renderLinks(link.childNodes, listStyle)}
+                </ul>
+              ) : ''}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  /**
+   * Handles a click on a tab header: switches the active tab and scrolls to the header.
+   */
+  private handleTabClick = (index: number, target: HTMLElement) => {
+    return (event: React.SyntheticEvent) => {
+      this.setState({ activeTabIndex: index });
+      this.scrollToHeader(target)(event);
+    };
+  }
+
+  /**
+   * Renders top-level headers as rounded, coloured chip tabs; clicking a tab shows its child headers and scrolls to it.
+   * @param links
+   * @param listStyle
+   */
+  private renderTabs(links: Link[], listStyle: string): JSX.Element {
+    const customFontSize = this.props.fontSize || '15px';
+    const bgColor = this.props.tileBackgroundColor || '#0078D4';
+    const textColor = this.props.tileTextColor || '#FFFFFF';
+    const activeIndex = this.state.activeTabIndex || 0;
+    const activeLink = links[activeIndex];
+
+    if (!links || links.length === 0) {
+      return <div className={styles.tabsContainer} />;
+    }
+
+    return (
+      <div className={styles.tabsContainer}>
+        <div className={styles.tabHeaders} role="tablist">
+          {links.map((link, index) => {
+            const linkText = this.getLinkText(link);
+            const isActive = index === activeIndex;
+            const chipStyle: React.CSSProperties = isActive
+              ? { fontSize: customFontSize, backgroundColor: bgColor, color: textColor }
+              : { fontSize: customFontSize, backgroundColor: 'transparent', color: bgColor, borderColor: bgColor };
+
+            return (
+              <button
+                key={index}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                className={styles.tileChip}
+                style={chipStyle}
+                onClick={this.handleTabClick(index, link.element)}
+              >
+                {this.renderChipIcon()}
+                <span>{linkText}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className={styles.tabPanel} role="tabpanel">
+          {activeLink && activeLink.childNodes.length > 0 ? (
+            <ul style={{ listStyleType: listStyle }}>
+              {this.renderLinks(activeLink.childNodes, listStyle)}
+            </ul>
+          ) : null}
+        </div>
+      </div>
+    );
   }
 
   /**
@@ -348,7 +476,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   }
 
   /**
-   * Event for the back to previous page link. 
+   * Event for the back to previous page link.
    * It uses the history count to work out how many pages to go back, as each click to a header results in history
    */
   public backToPreviousPage() {
@@ -405,8 +533,22 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     const headers = this.getHtmlElements(querySelector).filter(this.filterEmpty).filter(this.filterAside).filter(this.filterTocIgnore).filter(this.filterStyleDisplayNone);
     // create a list of links from headers
     const links = this.getLinks(headers);
-    // create components from a list of links
-    const toc = (<ul style={{ listStyleType: listStyle }}>{this.renderLinks(links, listStyle)}</ul>);
+
+    // create components from a list of links, depending on the selected layout mode
+    let toc: JSX.Element;
+    switch (this.props.layoutMode) {
+      case 'tiles':
+        toc = this.renderTiles(links, listStyle);
+        break;
+      case 'tabs':
+        toc = this.renderTabs(links, listStyle);
+        break;
+      case 'list':
+      default:
+        toc = (<ul style={{ listStyleType: listStyle }}>{this.renderLinks(links, listStyle)}</ul>);
+        break;
+    }
+
     // create previous page link
     const previousPageTitle = this.props.showPreviousPageLinkTitle && !this.props.hideTitle ? (this.renderBackToPreviousLink(listStyle)) : null;
     const previousPageAbove = this.props.showPreviousPageLinkAbove ? (this.renderBackToPreviousLink(listStyle)) : null;

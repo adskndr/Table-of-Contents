@@ -1,6 +1,7 @@
 import { IReadonlyTheme } from '@microsoft/sp-component-base';
 
 export interface ITableOfContentsProps {
+  themeVariant: IReadonlyTheme | undefined;
 
   hideTitle: boolean;
   titleText: string;
@@ -15,19 +16,20 @@ export interface ITableOfContentsProps {
   showHeading4: boolean;
   showHeading5: boolean;
 
-  previousPageText: string;
   showPreviousPageLinkTitle: boolean;
   showPreviousPageLinkAbove: boolean;
   showPreviousPageLinkBelow: boolean;
+  previousPageText: string;
 
   enableStickyMode: boolean;
   webpartId: string;
 
   hideInMobileView: boolean;
 
-  themeVariant: IReadonlyTheme | undefined;
-
   listStyle: string;
-
   isEditMode: boolean;
+
+  layoutMode: string;
+  tileBackgroundColor: string;
+  tileTextColor: string;
 }

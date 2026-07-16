@@ -12,6 +12,7 @@ import {
   PropertyPaneLabel,
   PropertyPaneDropdown
 } from "@microsoft/sp-property-pane";
+import { PropertyFieldColorPicker } from '@pnp/spfx-property-controls/lib/PropertyFieldColorPicker';
 import {
   ThemeProvider,
   ThemeChangedEventArgs,
@@ -41,7 +42,9 @@ export interface ITableOfContentsWebPartProps {
   hideInMobileView: boolean;
   listStyle: string;
   fontSize: string;
-
+  layoutMode: string;
+  tileBackgroundColor: string;
+  tileTextColor: string;
 }
 
 export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITableOfContentsWebPartProps> {
@@ -62,6 +65,15 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
       if (this.properties.searchText === undefined) {
         this.properties.searchText = true;
         this.properties.showHeading4 = true;
+      }
+      if (this.properties.layoutMode === undefined) {
+        this.properties.layoutMode = 'list';
+      }
+      if (this.properties.tileBackgroundColor === undefined) {
+        this.properties.tileBackgroundColor = '#0078D4';
+      }
+      if (this.properties.tileTextColor === undefined) {
+        this.properties.tileTextColor = '#FFFFFF';
       }
     });
   }
@@ -118,18 +130,15 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
 
         listStyle: this.properties.listStyle,
         isEditMode: this.displayMode == DisplayMode.Edit,
+
+        layoutMode: this.properties.layoutMode || 'list',
+        tileBackgroundColor: this.properties.tileBackgroundColor || '#0078D4',
+        tileTextColor: this.properties.tileTextColor || '#FFFFFF',
       }
     );
 
     ReactDom.render(element, this.domElement);
   }
-
-  /**
-   * Saves new value for the title property.
-   */
-  /*private handleUpdateProperty = (newValue: string) => {
-    this.properties.title = newValue;
-  }*/
 
   protected onDispose(): void {
     ReactDom.unmountComponentAtNode(this.domElement);
@@ -230,6 +239,38 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
                   ],
                   selectedKey: "default"
                 }),
+              ]
+            },
+            {
+              groupFields: [
+                PropertyPaneLabel('layoutModeLabel', {
+                  text: 'Layout'
+                }),
+                PropertyPaneDropdown('layoutMode', {
+                  label: 'Anzeigemodus',
+                  options: [
+                    { key: 'list', text: 'Liste' },
+                    { key: 'tiles', text: 'Kacheln' },
+                    { key: 'tabs', text: 'Tabs' }
+                  ],
+                  selectedKey: this.properties.layoutMode || 'list'
+                }),
+                PropertyFieldColorPicker('tileBackgroundColor', {
+                  label: 'Hintergrundfarbe (Kacheln/Tabs)',
+                  selectedColor: this.properties.tileBackgroundColor || '#0078D4',
+                  onPropertyChange: this.onPropertyPaneFieldChanged,
+                  properties: this.properties,
+                  disableAlpha: true,
+                  key: 'tileBackgroundColorFieldId'
+                } as any),
+                PropertyFieldColorPicker('tileTextColor', {
+                  label: 'Textfarbe (Kacheln/Tabs)',
+                  selectedColor: this.properties.tileTextColor || '#FFFFFF',
+                  onPropertyChange: this.onPropertyPaneFieldChanged,
+                  properties: this.properties,
+                  disableAlpha: true,
+                  key: 'tileTextColorFieldId'
+                } as any),
               ]
             },
             {
