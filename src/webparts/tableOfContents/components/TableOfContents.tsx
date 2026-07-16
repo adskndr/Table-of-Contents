@@ -791,26 +791,22 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     badgeStyle: React.CSSProperties;
     dividerStyle: React.CSSProperties;
   } {
-    if (levelStyle.useCustomColors) {
-      const bg = levelStyle.backgroundColor || TableOfContents.defaultLevelStyle.backgroundColor;
-      const text = levelStyle.textColor || TableOfContents.defaultLevelStyle.textColor;
-      return {
-        cardStyle: { backgroundColor: bg, color: text, borderLeftColor: bg },
-        iconBoxStyle: { backgroundColor: 'rgba(255, 255, 255, 0.2)', color: text },
-        badgeStyle: { backgroundColor: 'rgba(255, 255, 255, 0.25)', color: text },
-        dividerStyle: { borderTopColor: 'rgba(255, 255, 255, 0.3)' }
-      };
-    }
+    // Use the exact same background/text colors as the Kacheln/Tabs chips - either the level's
+    // custom colors, or (if not customized) the same theme token pair the chips already use.
+    // This guarantees identical, already-verified-working colors instead of a different set of
+    // "neutral surface" theme tokens that may not be reliably paired on every site theme.
+    const bg = levelStyle.useCustomColors
+      ? (levelStyle.backgroundColor || TableOfContents.defaultLevelStyle.backgroundColor)
+      : 'var(--primaryButtonBackground)';
+    const text = levelStyle.useCustomColors
+      ? (levelStyle.textColor || TableOfContents.defaultLevelStyle.textColor)
+      : 'var(--primaryButtonText)';
 
     return {
-      cardStyle: {
-        backgroundColor: 'var(--bodyBackground, #faf9f8)',
-        color: 'var(--neutralPrimary, #201f1e)',
-        borderLeftColor: 'var(--themePrimary)'
-      },
-      iconBoxStyle: { backgroundColor: 'var(--neutralLighter, #edebe9)', color: 'var(--themePrimary)' },
-      badgeStyle: { backgroundColor: 'var(--neutralLighter, #edebe9)', color: 'var(--neutralSecondary, #605e5c)' },
-      dividerStyle: { borderTopColor: 'var(--neutralLighter, #edebe9)' }
+      cardStyle: { backgroundColor: bg, color: text, borderLeftColor: bg },
+      iconBoxStyle: { backgroundColor: 'rgba(255, 255, 255, 0.2)', color: text },
+      badgeStyle: { backgroundColor: 'rgba(255, 255, 255, 0.25)', color: text },
+      dividerStyle: { borderTopColor: 'rgba(255, 255, 255, 0.3)' }
     };
   }
 
