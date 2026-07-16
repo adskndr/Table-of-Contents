@@ -60,14 +60,14 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
     this._themeProvider.themeChangedEvent.add(this, this._handleThemeChangedEvent);
     // return super.onInit()
     return super.onInit().then(_ => {
-	  if (this.properties.searchText === undefined) {
-	    this.properties.searchText = true;
-	    this.properties.showHeading4 = true;
-	  }
-	  if (this.properties.layoutMode === undefined) {
-	    this.properties.layoutMode = 'list';
-	  }
-	});
+      if (this.properties.searchText === undefined) {
+        this.properties.searchText = true;
+        this.properties.showHeading4 = true;
+      }
+      if (this.properties.layoutMode === undefined) {
+        this.properties.layoutMode = 'list';
+      }
+    });
   }
 
   private setCSSVariables(theming: any): any {
@@ -122,7 +122,8 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
 
         listStyle: this.properties.listStyle,
         isEditMode: this.displayMode == DisplayMode.Edit,
-		layoutMode: this.properties.layoutMode || 'list',
+
+        layoutMode: this.properties.layoutMode || 'list',
       }
     );
 
@@ -209,22 +210,6 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
                 }),
               ]
             },
-			{
-			  groupFields: [
-			    PropertyPaneLabel('layoutModeLabel', {
-			      text: 'Layout'
-			    }),
-			    PropertyPaneDropdown('layoutMode', {
-			      label: 'Anzeigemodus',
-			      options: [
-			        { key: 'list', text: 'Liste' },
-			        { key: 'tiles', text: 'Kacheln' },
-			        { key: 'tabs', text: 'Tabs' }
-			      ],
-			      selectedKey: this.properties.layoutMode || 'list'
-			    }),
-			  ]
-			},
             {
               groupFields: [
                 PropertyPaneLabel('showHeadingLevelsLabel', {
@@ -250,6 +235,22 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
                     { key: 'none', text: 'None' }
                   ],
                   selectedKey: "default"
+                }),
+              ]
+            },
+            {
+              groupFields: [
+                PropertyPaneLabel('layoutModeLabel', {
+                  text: 'Layout'
+                }),
+                PropertyPaneDropdown('layoutMode', {
+                  label: 'Anzeigemodus',
+                  options: [
+                    { key: 'list', text: 'Liste' },
+                    { key: 'tiles', text: 'Kacheln' },
+                    { key: 'tabs', text: 'Tabs' }
+                  ],
+                  selectedKey: this.properties.layoutMode || 'list'
                 }),
               ]
             },
