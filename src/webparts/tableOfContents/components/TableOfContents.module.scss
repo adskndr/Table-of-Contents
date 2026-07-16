@@ -14,60 +14,7 @@
     &:visited {
       color: var(--actionLink);
     }
-    .tilesContainer {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 12px;
-    list-style: none;
-    padding: 0;
-  }
-  .tile {
-    border: 1px solid var(--menuDivider);
-    border-radius: 4px;
-    padding: 12px;
-    background: var(--neutralLighterAlt);
-  }
-  .tileLink {
-    font-weight: 600;
-    display: block;
-    margin-bottom: 6px;
-  }
-  .tileChildList {
-    margin: 0;
-    padding-left: 16px;
-    font-size: 0.9em;
-  }
-  .tabsContainer {
-    display: flex;
-    flex-direction: column;
-  }
-  .tabHeaders {
-    display: flex;
-    flex-wrap: wrap;
-    border-bottom: 1px solid var(--menuDivider);
-    margin-bottom: 10px;
-  }
-  .tabHeader {
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    padding: 8px 12px;
-    cursor: pointer;
-    color: var(--actionLink);
-    font: inherit;
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-  .tabHeaderActive {
-    border-bottom-color: var(--primaryButtonBackground);
-    font-weight: 600;
-  }
-  .tabPanel {
-    padding-left: 4px;
-  }
-  }
-
+    
   li::marker {
     color: var(--primaryButtonBackground);
   }
@@ -94,3 +41,58 @@
     display: none !important;
   }
 }
+nav > ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+ 
+    // Kachel selbst
+> li {
+      background-color: #8a8f1a; // an eure Markenfarbe anpassen
+      border-radius: 2px;
+      padding: 14px 16px;
+ 
+      // der Link innerhalb der Kachel
+> a {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #201f1e;
+        font-weight: 600;
+        text-decoration: none;
+ 
+        // Icon vor dem Text (Unicode-Globus, alternativ Fluent-UI-Icon einbinden)
+&::before {
+          content: "\1F310"; // 🌐
+          font-size: 16px;
+        }
+ 
+        &:hover { color: #201f1e; text-decoration: underline; }
+&:visited { color: #201f1e; }
+      }
+ 
+      // Unterpunkte (H2, H3, ...) bleiben eine normale Liste, keine weiteren Kacheln
+      ul {
+        display: block;
+        list-style: disc;
+        margin: 8px 0 0 20px;
+        padding: 0;
+ 
+        li {
+          background: none;
+          padding: 2px 0;
+          border-radius: 0;
+ 
+          a {
+            display: inline;
+            color: var(--actionLink);
+            font-weight: normal;
+&::before { content: none; }
+          }
+        }
+      }
+    }
+  }
