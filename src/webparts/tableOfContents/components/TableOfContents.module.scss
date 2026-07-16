@@ -14,6 +14,58 @@
     &:visited {
       color: var(--actionLink);
     }
+    .tilesContainer {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    list-style: none;
+    padding: 0;
+  }
+  .tile {
+    border: 1px solid var(--menuDivider);
+    border-radius: 4px;
+    padding: 12px;
+    background: var(--neutralLighterAlt);
+  }
+  .tileLink {
+    font-weight: 600;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .tileChildList {
+    margin: 0;
+    padding-left: 16px;
+    font-size: 0.9em;
+  }
+  .tabsContainer {
+    display: flex;
+    flex-direction: column;
+  }
+  .tabHeaders {
+    display: flex;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--menuDivider);
+    margin-bottom: 10px;
+  }
+  .tabHeader {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 8px 12px;
+    cursor: pointer;
+    color: var(--actionLink);
+    font: inherit;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  .tabHeaderActive {
+    border-bottom-color: var(--primaryButtonBackground);
+    font-weight: 600;
+  }
+  .tabPanel {
+    padding-left: 4px;
+  }
   }
 
   li::marker {
