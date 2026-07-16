@@ -30,4 +30,6 @@ export interface ITableOfContentsProps {
   isEditMode: boolean;
 
   layoutMode: string;
+  tileBackgroundColor: string;
+  tileTextColor: string;
 }

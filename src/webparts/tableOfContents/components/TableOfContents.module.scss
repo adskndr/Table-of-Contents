@@ -1,108 +1,96 @@
 @import '~@fluentui/react/dist/sass/References.scss';
-
 .tableOfContents {
   a {
     color: var(--actionLink);
     text-decoration: none;
-
     &:hover {
       color: var(--actionLink);
       text-decoration: underline;
     }
-
     &:visited {
       color: var(--actionLink);
     }
-  } // <-- diese schließende Klammer hat gefehlt!
-
+  }
   li::marker {
     color: var(--primaryButtonBackground);
   }
-
   .backItem {
     border-top: 1px solid;
     border-bottom: 1px solid;
     border-color: var(--menuDivider);
-    margin-bottom: 10px;
+    margin-bottom: 10px
   }
-
   // hide on medium screens and smaller
   .hideInMobileView {
     @include ms-screen-lg-down {
       display: none !important;
     }
   }
-
   .title {
     min-height: auto;
   }
-
   .hideTitle {
     display: none !important;
   }
-}
 
-nav > ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
+  // Shared chip style used by both Kacheln (tiles) and Tabs
+  .tileChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 10px;
+    border: 1.5px solid transparent;
+    text-decoration: none !important;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: filter 0.15s ease-in-out, opacity 0.15s ease-in-out;
+    white-space: nowrap;
 
-  // Kachel selbst
-  > li {
-    background-color: #8a8f1a; // an eure Markenfarbe anpassen
-    border-radius: 2px;
-    padding: 14px 16px;
-
-    // der Link innerhalb der Kachel
-    > a {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      color: #201f1e;
-      font-weight: 600;
-      text-decoration: none;
-
-      // Icon vor dem Text (Unicode-Globus, alternativ Fluent-UI-Icon einbinden)
-      &::before {
-        content: "\1F310"; // 🌐
-        font-size: 16px;
-      }
-
-      &:hover {
-        color: #201f1e;
-        text-decoration: underline;
-      }
-
-      &:visited {
-        color: #201f1e;
-      }
+    &:hover {
+      filter: brightness(0.92);
+      text-decoration: none !important;
     }
-
-    // Unterpunkte (H2, H3, ...) bleiben eine normale Liste, keine weiteren Kacheln
-    ul {
-      display: block;
-      list-style: disc;
-      margin: 8px 0 0 20px;
-      padding: 0;
-
-      li {
-        background: none;
-        padding: 2px 0;
-        border-radius: 0;
-
-        a {
-          display: inline;
-          color: var(--actionLink);
-          font-weight: normal;
-
-          &::before {
-            content: none;
-          }
-        }
-      }
+    &:visited {
+      color: inherit;
     }
+  }
+  .chipIcon {
+    flex: 0 0 auto;
+  }
+
+  // Tiles layout
+  .tilesContainer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    list-style: none;
+    padding: 0;
+  }
+  .tile {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .tileChildList {
+    margin: 6px 0 0 0;
+    padding-left: 16px;
+    font-size: 0.9em;
+  }
+
+  // Tabs layout
+  .tabsContainer {
+    display: flex;
+    flex-direction: column;
+  }
+  .tabHeaders {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .tabPanel {
+    padding-left: 4px;
   }
 }
