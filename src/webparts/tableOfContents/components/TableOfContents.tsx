@@ -584,7 +584,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     }
     const indexOf = (link: Link): number => {
       const idx = order.indexOf(this.getLinkKey(link));
-      return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
+      return idx === -1 ? Infinity : idx;
     };
     // Stable sort: links with an unknown key keep their original relative order at the end.
     return links
