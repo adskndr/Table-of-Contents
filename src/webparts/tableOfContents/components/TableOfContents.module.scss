@@ -1,7 +1,6 @@
 @import '~@fluentui/react/dist/sass/References.scss';
 
 .tableOfContents {
-
   a {
     color: var(--actionLink);
     text-decoration: none;
@@ -14,7 +13,8 @@
     &:visited {
       color: var(--actionLink);
     }
-    
+  } // <-- diese schließende Klammer hat gefehlt!
+
   li::marker {
     color: var(--primaryButtonBackground);
   }
@@ -23,7 +23,7 @@
     border-top: 1px solid;
     border-bottom: 1px solid;
     border-color: var(--menuDivider);
-    margin-bottom: 10px
+    margin-bottom: 10px;
   }
 
   // hide on medium screens and smaller
@@ -41,58 +41,68 @@
     display: none !important;
   }
 }
+
 nav > ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 10px;
- 
-    // Kachel selbst
-> li {
-      background-color: #8a8f1a; // an eure Markenfarbe anpassen
-      border-radius: 2px;
-      padding: 14px 16px;
- 
-      // der Link innerhalb der Kachel
-> a {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        color: #201f1e;
-        font-weight: 600;
-        text-decoration: none;
- 
-        // Icon vor dem Text (Unicode-Globus, alternativ Fluent-UI-Icon einbinden)
-&::before {
-          content: "\1F310"; // 🌐
-          font-size: 16px;
-        }
- 
-        &:hover { color: #201f1e; text-decoration: underline; }
-&:visited { color: #201f1e; }
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+
+  // Kachel selbst
+  > li {
+    background-color: #8a8f1a; // an eure Markenfarbe anpassen
+    border-radius: 2px;
+    padding: 14px 16px;
+
+    // der Link innerhalb der Kachel
+    > a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #201f1e;
+      font-weight: 600;
+      text-decoration: none;
+
+      // Icon vor dem Text (Unicode-Globus, alternativ Fluent-UI-Icon einbinden)
+      &::before {
+        content: "\1F310"; // 🌐
+        font-size: 16px;
       }
- 
-      // Unterpunkte (H2, H3, ...) bleiben eine normale Liste, keine weiteren Kacheln
-      ul {
-        display: block;
-        list-style: disc;
-        margin: 8px 0 0 20px;
-        padding: 0;
- 
-        li {
-          background: none;
-          padding: 2px 0;
-          border-radius: 0;
- 
-          a {
-            display: inline;
-            color: var(--actionLink);
-            font-weight: normal;
-&::before { content: none; }
+
+      &:hover {
+        color: #201f1e;
+        text-decoration: underline;
+      }
+
+      &:visited {
+        color: #201f1e;
+      }
+    }
+
+    // Unterpunkte (H2, H3, ...) bleiben eine normale Liste, keine weiteren Kacheln
+    ul {
+      display: block;
+      list-style: disc;
+      margin: 8px 0 0 20px;
+      padding: 0;
+
+      li {
+        background: none;
+        padding: 2px 0;
+        border-radius: 0;
+
+        a {
+          display: inline;
+          color: var(--actionLink);
+          font-weight: normal;
+
+          &::before {
+            content: none;
           }
         }
       }
     }
   }
+}
