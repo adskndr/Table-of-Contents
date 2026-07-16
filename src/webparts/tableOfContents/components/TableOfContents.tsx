@@ -785,7 +785,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
    *   token pairs SharePoint itself uses for a neutral card surface - these are guaranteed by
    *   the theme to always be legible together, in both light and dark site themes.
    */
-  private getCardChrome(levelStyle: ILevelStyle, isTopLevel: boolean): {
+  private getCardChrome(levelStyle: ILevelStyle): {
     cardStyle: React.CSSProperties;
     iconBoxStyle: React.CSSProperties;
     badgeStyle: React.CSSProperties;
@@ -804,7 +804,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
 
     return {
       cardStyle: {
-        backgroundColor: isTopLevel ? 'var(--bodyBackground, #faf9f8)' : 'var(--neutralLighterAlt, #faf9f8)',
+        backgroundColor: 'var(--bodyBackground, #faf9f8)',
         color: 'var(--neutralPrimary, #201f1e)',
         borderLeftColor: 'var(--themePrimary)'
       },
@@ -825,7 +825,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     const isTopLevel = depth === 0;
     const canDrag = isTopLevel && this.props.allowCardReordering;
     const containerClass = isTopLevel ? styles.cardsGrid : styles.cardsNestedGroup;
-    const chrome = this.getCardChrome(levelStyle, isTopLevel);
+    const chrome = this.getCardChrome(levelStyle);
 
     return (
       <div className={containerClass}>
@@ -839,7 +839,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
 
           return (
             <div
-              className={isTopLevel ? styles.card : styles.cardNested}
+              className={styles.card}
               key={linkText + index}
               style={chrome.cardStyle}
               draggable={canDrag}

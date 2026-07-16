@@ -140,17 +140,15 @@
   .card[draggable="true"]:active {
     cursor: grabbing;
   }
-  // Nested cards (H2 inside H1, H3 inside H2, ...): visually subordinate to their parent card
+  // Nested card groups (H2 inside H1, H3 inside H2, ...) are indented to stay visually
+  // subordinate to their parent, but every card - regardless of depth - uses the same .card
+  // style above, so H1 through H4 all look identical (matching the Kacheln/Tabs approach).
   .cardsNestedGroup {
     display: flex;
     flex-direction: column;
     gap: 8px;
     margin-top: 10px;
     padding-left: 14px;
-  }
-  .cardNested {
-    border-radius: var(--effect-roundedCorner4, 6px);
-    padding: 8px 12px;
   }
   .cardHeader {
     display: flex;
