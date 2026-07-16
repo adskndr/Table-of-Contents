@@ -376,7 +376,7 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
                 PropertyPaneTextField('fontSize', {
 				  label: 'Schriftgröße (z. B. 16px, 14px oder 1.2rem)',
 				  description: 'Gib die gewünschte Größe mit Einheit an.',
-				  value: '15px' // Standardwert, falls nichts eingegeben wurde
+				  value: '18px' // Standardwert, falls nichts eingegeben wurde
 				})
               ]
 			}

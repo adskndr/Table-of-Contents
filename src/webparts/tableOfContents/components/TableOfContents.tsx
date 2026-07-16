@@ -27,6 +27,9 @@ interface Link {
 export default class TableOfContents extends React.Component<ITableOfContentsProps, ITableOfContentsState> {
   private static timeout = 500;
 
+  /** Transient (non-state) index of the H1 card currently being dragged, cleared once the drag ends. */
+  private dragSourceIndex: number | undefined = undefined;
+
   private static h2Tag = "h2";
   private static h3Tag = "h3";
   private static h4Tag = "h4";
@@ -50,7 +53,9 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     super(props);
     this.state = {
       historyCount: -1,
-      activeTabPath: {}
+      activeTabPath: {},
+      expandedPaths: {},
+      cardOrderKeys: []
     };
   }
 
@@ -376,18 +381,6 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     return linkText;
   }
 
-  /**
-   * Small decorative icon shown in front of tile/tab labels.
-   * Swap the <path> below for any other Fluent-style icon glyph if you'd like a different symbol.
-   */
-  private renderChipIcon(): JSX.Element {
-    return (
-      <svg className={styles.chipIcon} viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
-        <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
-        <path d="M1.7 8h12.6M8 1.7c1.8 1.7 1.8 11 0 12.6M8 1.7c-1.8 1.7-1.8 11 0 12.6" fill="none" stroke="currentColor" strokeWidth="1.1" />
-      </svg>
-    );
-  }
 
   /**
    * Creates a list of components to display from a list of links.
@@ -448,7 +441,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
                 href={'#' + link.element.id}
                 style={chipStyle}
               >
-                {this.renderLevelIcon(levelStyle) || this.renderChipIcon()}
+                {this.renderLevelIcon(levelStyle)}
                 <span>{linkText}</span>
               </a>
               {link.childNodes.length > 0 ? this.renderTiles(link.childNodes, listStyle, depth + 1) : null}
@@ -512,7 +505,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
                 style={chipStyle}
                 onClick={this.handleTabClick(path, index, link.element)}
               >
-                {this.renderLevelIcon(levelStyle) || this.renderChipIcon()}
+                {this.renderLevelIcon(levelStyle)}
                 <span>{linkText}</span>
               </button>
             );
@@ -534,9 +527,241 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
    * Once valid ids got assigned to headers by SharePoint code, the component will get valid ids for headers. This way a link from ToC can be copied by a user and it will be a valid link to a header.
    */
   public componentDidMount() {
+    this.loadCardOrder();
     setInterval(() => {
       this.setState({});
     }, TableOfContents.timeout);
+  }
+
+  /**
+   * Returns the localStorage key used to persist the H1 card order for this webpart instance on this page.
+   */
+  private getCardOrderStorageKey(): string {
+    return `tocCardOrder_${this.props.webpartId}_${document.location.pathname}`;
+  }
+
+  /**
+   * Loads a previously saved custom H1 card order (if any) from localStorage.
+   */
+  private loadCardOrder(): void {
+    try {
+      const raw = window.localStorage.getItem(this.getCardOrderStorageKey());
+      if (raw) {
+        const cardOrderKeys = JSON.parse(raw) as string[];
+        this.setState({ cardOrderKeys });
+      }
+    } catch (e) {
+      // localStorage unavailable or corrupt data - fall back to natural page order.
+    }
+  }
+
+  /**
+   * Saves the current custom H1 card order to localStorage so it persists across visits (per browser).
+   */
+  private persistCardOrder(cardOrderKeys: string[]): void {
+    try {
+      window.localStorage.setItem(this.getCardOrderStorageKey(), JSON.stringify(cardOrderKeys));
+    } catch (e) {
+      // Ignore storage errors (e.g. private browsing quota).
+    }
+  }
+
+  /**
+   * Returns a stable key identifying a top-level link for reordering purposes.
+   */
+  private getLinkKey(link: Link): string {
+    return this.getLinkText(link);
+  }
+
+  /**
+   * Re-orders top-level links according to the persisted custom order, if any.
+   * Unknown links (new headers not seen before) keep their natural relative order and are appended at the end.
+   */
+  private getOrderedLinks(links: Link[]): Link[] {
+    const order = this.state.cardOrderKeys;
+    if (!order || order.length === 0) {
+      return links;
+    }
+    const indexOf = (link: Link): number => {
+      const idx = order.indexOf(this.getLinkKey(link));
+      return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
+    };
+    // Stable sort: links with an unknown key keep their original relative order at the end.
+    return links
+      .map((link, originalIndex) => ({ link, originalIndex }))
+      .sort((a, b) => {
+        const diff = indexOf(a.link) - indexOf(b.link);
+        return diff !== 0 ? diff : a.originalIndex - b.originalIndex;
+      })
+      .map((entry) => entry.link);
+  }
+
+  /**
+   * Counts every descendant link nested under the given link (children, grandchildren, ...).
+   * Used for the small count badge shown on a card (layout = "cards").
+   */
+  private countDescendants(link: Link): number {
+    let count = 0;
+    for (const child of link.childNodes) {
+      count += 1 + this.countDescendants(child);
+    }
+    return count;
+  }
+
+  /**
+   * Whether the card at the given path is currently expanded. Defaults to expanded.
+   */
+  private isCardExpanded(path: string): boolean {
+    return this.state.expandedPaths[path] !== false;
+  }
+
+  /**
+   * Toggles expand/collapse for the card at the given path.
+   */
+  private toggleCardExpanded = (path: string) => {
+    return (event: React.SyntheticEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const isExpanded = this.isCardExpanded(path);
+      this.setState((prevState) => ({
+        expandedPaths: { ...prevState.expandedPaths, [path]: !isExpanded }
+      }));
+    };
+  }
+
+  /**
+   * Drag-and-drop handlers for reordering top-level (H1) cards. Only used when depth === 0
+   * and this.props.allowCardReordering is true.
+   */
+  private handleCardDragStart = (index: number) => {
+    return (event: React.DragEvent<HTMLDivElement>) => {
+      this.dragSourceIndex = index;
+      event.dataTransfer.effectAllowed = 'move';
+    };
+  }
+
+  private handleCardDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }
+
+  private handleCardDrop = (targetIndex: number, orderedLinks: Link[]) => {
+    return (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const sourceIndex = this.dragSourceIndex;
+      this.dragSourceIndex = undefined;
+
+      if (sourceIndex === undefined || sourceIndex === targetIndex) {
+        return;
+      }
+
+      const reordered = orderedLinks.slice();
+      const [moved] = reordered.splice(sourceIndex, 1);
+      reordered.splice(targetIndex, 0, moved);
+
+      const cardOrderKeys = reordered.map((link) => this.getLinkKey(link));
+      this.setState({ cardOrderKeys });
+      this.persistCardOrder(cardOrderKeys);
+    };
+  }
+
+  /**
+   * Small chevron icon indicating expand/collapse state of a card.
+   */
+  private renderChevron(isExpanded: boolean): JSX.Element {
+    return (
+      <svg
+        className={isExpanded ? styles.cardChevronExpanded : styles.cardChevron}
+        viewBox="0 0 12 12"
+        width="12"
+        height="12"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  /**
+   * Renders headers as collapsible "cards" (icon, title, count badge, coloured accent bar), nested
+   * recursively so that H1 > H2 > H3 > H4 each appear as their own (smaller) card indented inside
+   * their parent's card - i.e. every level is its own card, but stays visually subordinate to its parent.
+   * Only the top-level (H1) cards can be freely reordered via drag-and-drop.
+   * @param links
+   * @param listStyle
+   * @param depth nesting depth: 0 = Level 1 (H1), 1 = Level 2 (H2), 2 = Level 3 (H3), 3 = Level 4 (H4)
+   * @param path identifies this card's position in the hierarchy, used as a key into expandedPaths
+   */
+  private renderCards(links: Link[], listStyle: string, depth: number = 0, path: string = 'root'): JSX.Element {
+    if (!links || links.length === 0) {
+      return depth === 0 ? <div className={styles.cardsGrid} /> : null;
+    }
+
+    const levelStyle = this.getLevelStyle(depth);
+    const orderedLinks = depth === 0 ? this.getOrderedLinks(links) : links;
+    const isTopLevel = depth === 0;
+    const canDrag = isTopLevel && this.props.allowCardReordering;
+    const containerClass = isTopLevel ? styles.cardsGrid : styles.cardsNestedGroup;
+    const accentColor = levelStyle.useCustomColors
+      ? (levelStyle.backgroundColor || TableOfContents.defaultLevelStyle.backgroundColor)
+      : 'var(--themePrimary)';
+
+    return (
+      <div className={containerClass}>
+        {orderedLinks.map((link, index) => {
+          const linkText = this.getLinkText(link);
+          const cardPath = `${path}-${index}`;
+          const hasChildren = link.childNodes.length > 0;
+          const expanded = this.isCardExpanded(cardPath);
+          const descendantCount = this.countDescendants(link);
+          const icon = this.renderLevelIcon(levelStyle);
+
+          return (
+            <div
+              className={isTopLevel ? styles.card : styles.cardNested}
+              key={linkText + index}
+              style={{ borderLeftColor: accentColor }}
+              draggable={canDrag}
+              onDragStart={canDrag ? this.handleCardDragStart(index) : undefined}
+              onDragOver={canDrag ? this.handleCardDragOver : undefined}
+              onDrop={canDrag ? this.handleCardDrop(index, orderedLinks) : undefined}
+            >
+              <a
+                className={styles.cardHeader}
+                href={'#' + link.element.id}
+                onClick={this.scrollToHeader(link.element)}
+              >
+                {icon ? (
+                  <span className={styles.cardIconBox}>
+                    {icon}
+                  </span>
+                ) : null}
+                <span className={styles.cardTitle}>{linkText}</span>
+                {descendantCount > 0 ? <span className={styles.cardBadge}>{descendantCount}</span> : null}
+                {hasChildren ? (
+                  <button
+                    type="button"
+                    className={styles.cardToggle}
+                    aria-expanded={expanded}
+                    aria-label={expanded ? 'Zusammenklappen' : 'Ausklappen'}
+                    onClick={this.toggleCardExpanded(cardPath)}
+                  >
+                    {this.renderChevron(expanded)}
+                  </button>
+                ) : null}
+              </a>
+              {hasChildren && expanded ? (
+                <React.Fragment>
+                  <div className={styles.cardDivider} />
+                  {this.renderCards(link.childNodes, listStyle, depth + 1, cardPath)}
+                </React.Fragment>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    );
   }
 
   /**
@@ -606,6 +831,9 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
         break;
       case 'tabs':
         toc = this.renderTabs(links, listStyle);
+        break;
+      case 'cards':
+        toc = this.renderCards(links, listStyle);
         break;
       case 'list':
       default:
