@@ -129,9 +129,9 @@
   // colors, exactly like the Kacheln/Tabs chips. The rules below are layout-only; colors are
   // deliberately NOT hardcoded here so the inline style (and thus the theme) always wins.
   .card {
-    border-radius: 8px;
+    border-radius: var(--effect-roundedCorner6, 8px);
     border-left: 4px solid transparent;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--effect-elevation4, 0 1px 3px rgba(0, 0, 0, 0.08));
     padding: 14px 16px;
   }
   .card[draggable="true"] {
@@ -147,11 +147,9 @@
     gap: 8px;
     margin-top: 10px;
     padding-left: 14px;
-    border-left: 2px solid var(--neutralLighter, #edebe9);
   }
   .cardNested {
-    border-radius: 6px;
-    border-left: 3px solid transparent;
+    border-radius: var(--effect-roundedCorner4, 6px);
     padding: 8px 12px;
   }
   .cardHeader {
@@ -171,7 +169,7 @@
     flex: 0 0 auto;
     width: 28px;
     height: 28px;
-    border-radius: 6px;
+    border-radius: var(--effect-roundedCorner4, 6px);
     display: flex;
     align-items: center;
     justify-content: center;
