@@ -321,12 +321,48 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
    * Swap the <path> below for any other Fluent-style icon glyph if you'd like a different symbol.
    */
   private renderChipIcon(): JSX.Element {
+    if (this.props.tabIconUrl) {
+      return <img src={this.props.tabIconUrl} className={styles.chipIcon} width={14} height={14} alt="" aria-hidden="true" />;
+    }
     return (
       <svg className={styles.chipIcon} viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
         <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
         <path d="M1.7 8h12.6M8 1.7c1.8 1.7 1.8 11 0 12.6M8 1.7c-1.8 1.7-1.8 11 0 12.6" fill="none" stroke="currentColor" strokeWidth="1.1" />
       </svg>
     );
+  }
+
+  /**
+   * Determines the background/text colour for a given nesting level (1 = top level).
+   * Uses the level's custom colours if enabled, otherwise falls back to SharePoint
+   * theme CSS variables so the tiles/tabs automatically match the site design.
+   * Level 4 is reused for any deeper levels (max. 4 configurable levels).
+   */
+  private getLevelStyle(level: number): React.CSSProperties {
+    const clampedLevel = Math.min(Math.max(level, 1), 4);
+    const props = this.props as any;
+    const useCustom = props[`level${clampedLevel}CustomColors`];
+    const bgColor = props[`level${clampedLevel}BgColor`];
+    const textColor = props[`level${clampedLevel}TextColor`];
+
+    if (useCustom && bgColor && textColor) {
+      return { backgroundColor: bgColor, color: textColor };
+    }
+
+    switch (clampedLevel) {
+      case 1:
+        return { backgroundColor: 'var(--primaryButtonBackground)', color: 'var(--primaryButtonText)' };
+      case 2:
+        return { backgroundColor: 'var(--buttonBackground)', color: 'var(--buttonText)' };
+      case 3:
+        return { backgroundColor: 'var(--listItemBackgroundHovered)', color: 'var(--bodyText)' };
+      default:
+        return {
+          backgroundColor: 'var(--bodyBackground)',
+          color: 'var(--bodyText)',
+          border: '1px solid var(--variantBorder)'
+        };
+    }
   }
 
   /**
@@ -359,21 +395,23 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   }
 
   /**
-   * Renders top-level headers as a grid of rounded, coloured chip tiles.
+   * Recursively renders headers as nested, coloured tiles — one visual level per heading depth.
+   * Level 1 = top-level headers, their child headers become nested tiles inside (level 2), and so on.
    * @param links
+   * @param level current nesting depth (1-based)
    * @param listStyle
    */
-  private renderTiles(links: Link[], listStyle: string): JSX.Element {
-    const customFontSize = this.props.fontSize || '15px';
-    const bgColor = this.props.tileBackgroundColor || '#0078D4';
-    const textColor = this.props.tileTextColor || '#FFFFFF';
-
+  private renderTileLevel = (links: Link[], level: number, listStyle: string): JSX.Element => {
     if (!links || links.length === 0) {
-      return <div className={styles.tilesContainer} />;
+      return null;
     }
 
+    const customFontSize = this.props.fontSize || '15px';
+    const levelStyle = this.getLevelStyle(level);
+    const containerClass = level === 1 ? styles.tilesContainer : styles.tilesContainerNested;
+
     return (
-      <div className={styles.tilesContainer}>
+      <div className={containerClass}>
         {links.map((link, index) => {
           const linkText = this.getLinkText(link);
 
@@ -383,16 +421,12 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
                 className={styles.tileChip}
                 onClick={this.scrollToHeader(link.element)}
                 href={'#' + link.element.id}
-                style={{ fontSize: customFontSize, backgroundColor: bgColor, color: textColor }}
+                style={{ fontSize: customFontSize, ...levelStyle }}
               >
                 {this.renderChipIcon()}
                 <span>{linkText}</span>
               </a>
-              {link.childNodes.length > 0 ? (
-                <ul style={{ listStyleType: listStyle }} className={styles.tileChildList}>
-                  {this.renderLinks(link.childNodes, listStyle)}
-                </ul>
-              ) : ''}
+              {link.childNodes.length > 0 ? this.renderTileLevel(link.childNodes, level + 1, listStyle) : null}
             </div>
           );
         })}
@@ -411,14 +445,14 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   }
 
   /**
-   * Renders top-level headers as rounded, coloured chip tabs; clicking a tab shows its child headers and scrolls to it.
+   * Renders top-level headers as rounded, coloured chip tabs; clicking a tab shows its child headers
+   * (rendered recursively as nested tiles) and scrolls to it. Colours come from level 1 (theme or custom).
    * @param links
    * @param listStyle
    */
   private renderTabs(links: Link[], listStyle: string): JSX.Element {
     const customFontSize = this.props.fontSize || '15px';
-    const bgColor = this.props.tileBackgroundColor || '#0078D4';
-    const textColor = this.props.tileTextColor || '#FFFFFF';
+    const levelStyle = this.getLevelStyle(1);
     const activeIndex = this.state.activeTabIndex || 0;
     const activeLink = links[activeIndex];
 
@@ -433,8 +467,13 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
             const linkText = this.getLinkText(link);
             const isActive = index === activeIndex;
             const chipStyle: React.CSSProperties = isActive
-              ? { fontSize: customFontSize, backgroundColor: bgColor, color: textColor }
-              : { fontSize: customFontSize, backgroundColor: 'transparent', color: bgColor, borderColor: bgColor };
+              ? { fontSize: customFontSize, ...levelStyle }
+              : {
+                  fontSize: customFontSize,
+                  backgroundColor: 'transparent',
+                  color: levelStyle.backgroundColor as string,
+                  borderColor: levelStyle.backgroundColor as string
+                };
 
             return (
               <button
@@ -453,11 +492,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
           })}
         </div>
         <div className={styles.tabPanel} role="tabpanel">
-          {activeLink && activeLink.childNodes.length > 0 ? (
-            <ul style={{ listStyleType: listStyle }}>
-              {this.renderLinks(activeLink.childNodes, listStyle)}
-            </ul>
-          ) : null}
+          {activeLink && activeLink.childNodes.length > 0 ? this.renderTileLevel(activeLink.childNodes, 2, listStyle) : null}
         </div>
       </div>
     );
@@ -538,7 +573,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     let toc: JSX.Element;
     switch (this.props.layoutMode) {
       case 'tiles':
-        toc = this.renderTiles(links, listStyle);
+        toc = this.renderTileLevel(links, 1, listStyle);
         break;
       case 'tabs':
         toc = this.renderTabs(links, listStyle);
