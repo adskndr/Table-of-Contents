@@ -13,6 +13,8 @@ import {
   PropertyPaneDropdown
 } from "@microsoft/sp-property-pane";
 import { PropertyFieldColorPicker } from '@pnp/spfx-property-controls/lib/PropertyFieldColorPicker';
+import { PropertyFieldIconPicker } from '@pnp/spfx-property-controls/lib/PropertyFieldIconPicker';
+import { PropertyFieldFilePicker, IPropertyFieldFilePickerProps } from '@pnp/spfx-property-controls/lib/PropertyFieldFilePicker';
 import {
   ThemeProvider,
   ThemeChangedEventArgs,
@@ -21,7 +23,20 @@ import {
 
 import * as strings from 'TableOfContentsWebPartStrings';
 import TableOfContents from './components/TableOfContents';
-import { ITableOfContentsProps } from './components/ITableOfContentsProps';
+import { ITableOfContentsProps, ILevelStyle } from './components/ITableOfContentsProps';
+
+/**
+ * Flat (property-pane friendly) representation of one heading level's style, stored directly
+ * on the webpart properties as h1..., h2..., h3..., h4... prefixed fields.
+ */
+interface ILevelStyleProps {
+  useCustomColors: boolean;
+  backgroundColor: string;
+  textColor: string;
+  iconType: 'none' | 'icon' | 'image';
+  iconName?: string;
+  iconUrl?: string;
+}
 
 export interface ITableOfContentsWebPartProps {
   hideTitle: boolean;
@@ -43,8 +58,34 @@ export interface ITableOfContentsWebPartProps {
   listStyle: string;
   fontSize: string;
   layoutMode: string;
-  tileBackgroundColor: string;
-  tileTextColor: string;
+
+  h1UseCustomColors: boolean;
+  h1BackgroundColor: string;
+  h1TextColor: string;
+  h1IconType: 'none' | 'icon' | 'image';
+  h1IconName: string;
+  h1IconUrl: string;
+
+  h2UseCustomColors: boolean;
+  h2BackgroundColor: string;
+  h2TextColor: string;
+  h2IconType: 'none' | 'icon' | 'image';
+  h2IconName: string;
+  h2IconUrl: string;
+
+  h3UseCustomColors: boolean;
+  h3BackgroundColor: string;
+  h3TextColor: string;
+  h3IconType: 'none' | 'icon' | 'image';
+  h3IconName: string;
+  h3IconUrl: string;
+
+  h4UseCustomColors: boolean;
+  h4BackgroundColor: string;
+  h4TextColor: string;
+  h4IconType: 'none' | 'icon' | 'image';
+  h4IconName: string;
+  h4IconUrl: string;
 }
 
 export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITableOfContentsWebPartProps> {
@@ -69,12 +110,49 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
       if (this.properties.layoutMode === undefined) {
         this.properties.layoutMode = 'list';
       }
-      if (this.properties.tileBackgroundColor === undefined) {
-        this.properties.tileBackgroundColor = '#0078D4';
+      // Default styling for each level: follow the SharePoint design (no custom colors, no icon)
+      // until the user explicitly opts in to custom colors/icons for that level.
+      for (const level of [1, 2, 3, 4]) {
+        this.setLevelStyleDefault(level);
       }
-      if (this.properties.tileTextColor === undefined) {
-        this.properties.tileTextColor = '#FFFFFF';
-      }
+    });
+  }
+
+  /**
+   * Ensures a heading level has default style property values the first time the webpart runs.
+   */
+  private setLevelStyleDefault(level: number): void {
+    const props = this.properties as unknown as { [key: string]: unknown };
+    if (props[`h${level}UseCustomColors`] === undefined) {
+      props[`h${level}UseCustomColors`] = false;
+    }
+    if (props[`h${level}BackgroundColor`] === undefined) {
+      props[`h${level}BackgroundColor`] = '#0078D4';
+    }
+    if (props[`h${level}TextColor`] === undefined) {
+      props[`h${level}TextColor`] = '#FFFFFF';
+    }
+    if (props[`h${level}IconType`] === undefined) {
+      props[`h${level}IconType`] = 'none';
+    }
+  }
+
+  /**
+   * Reads the flat, per-level property-pane fields (h1..., h2..., h3..., h4...) and assembles
+   * them into the ILevelStyle[] array consumed by the React component.
+   */
+  private getLevelStyles(): ILevelStyle[] {
+    const props = this.properties as unknown as { [key: string]: unknown };
+    return [1, 2, 3, 4].map((level) => {
+      const style: ILevelStyleProps = {
+        useCustomColors: !!props[`h${level}UseCustomColors`],
+        backgroundColor: (props[`h${level}BackgroundColor`] as string) || '#0078D4',
+        textColor: (props[`h${level}TextColor`] as string) || '#FFFFFF',
+        iconType: (props[`h${level}IconType`] as 'none' | 'icon' | 'image') || 'none',
+        iconName: props[`h${level}IconName`] as string,
+        iconUrl: props[`h${level}IconUrl`] as string
+      };
+      return style;
     });
   }
 
@@ -132,8 +210,7 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
         isEditMode: this.displayMode == DisplayMode.Edit,
 
         layoutMode: this.properties.layoutMode || 'list',
-        tileBackgroundColor: this.properties.tileBackgroundColor || '#0078D4',
-        tileTextColor: this.properties.tileTextColor || '#FFFFFF',
+        levelStyles: this.getLevelStyles(),
       }
     );
 
@@ -255,24 +332,12 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
                   ],
                   selectedKey: this.properties.layoutMode || 'list'
                 }),
-                PropertyFieldColorPicker('tileBackgroundColor', {
-                  label: 'Hintergrundfarbe (Kacheln/Tabs)',
-                  selectedColor: this.properties.tileBackgroundColor || '#0078D4',
-                  onPropertyChange: this.onPropertyPaneFieldChanged,
-                  properties: this.properties,
-                  disableAlpha: true,
-                  key: 'tileBackgroundColorFieldId'
-                } as any),
-                PropertyFieldColorPicker('tileTextColor', {
-                  label: 'Textfarbe (Kacheln/Tabs)',
-                  selectedColor: this.properties.tileTextColor || '#FFFFFF',
-                  onPropertyChange: this.onPropertyPaneFieldChanged,
-                  properties: this.properties,
-                  disableAlpha: true,
-                  key: 'tileTextColorFieldId'
-                } as any),
+                PropertyPaneLabel('layoutModeDescription', {
+                  text: 'Bei Kacheln und Tabs werden Ebene 1 bis 4 (H1-H4) ineinander verschachtelt dargestellt.'
+                })
               ]
             },
+            ...([1, 2, 3, 4].map((level) => this.getLevelStyleGroup(level))),
             {
               groupFields: [
                 PropertyPaneLabel('previousPageLabel', {
@@ -317,6 +382,91 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
 			}
           ]
         }
+      ]
+    };
+  }
+
+  /**
+   * Builds the property pane group for one heading level (H1-H4): a toggle to choose between
+   * "SharePoint design" and custom colors, the color pickers (only active if custom colors are on),
+   * and an icon chooser that lets the user pick either a Fluent UI icon (icon library) or a custom image.
+   */
+  private getLevelStyleGroup(level: number): { groupFields: any[] } {
+    const props = this.properties as unknown as { [key: string]: unknown };
+    const prefix = `h${level}`;
+    const useCustomColors = !!props[`${prefix}UseCustomColors`];
+    const iconType = (props[`${prefix}IconType`] as string) || 'none';
+
+    const filePickerProps: IPropertyFieldFilePickerProps & { key: string } = {
+      context: this.context as any,
+      filePickerResult: props[`${prefix}IconUrl`]
+        ? ({ fileAbsoluteUrl: props[`${prefix}IconUrl`] } as any)
+        : undefined,
+      onSave: (fileResult: { fileAbsoluteUrl: string }) => {
+        (this.properties as unknown as { [key: string]: unknown })[`${prefix}IconUrl`] = fileResult.fileAbsoluteUrl;
+        this.render();
+      },
+      onChanged: (fileResult: { fileAbsoluteUrl: string }) => {
+        (this.properties as unknown as { [key: string]: unknown })[`${prefix}IconUrl`] = fileResult.fileAbsoluteUrl;
+        this.render();
+      },
+      buttonLabel: 'Bild auswählen',
+      disabled: iconType !== 'image',
+      key: `${prefix}IconUrlFieldId`
+    } as any;
+
+    return {
+      groupFields: [
+        PropertyPaneLabel(`${prefix}Label`, {
+          text: `Ebene ${level} (H${level}) - Kacheln/Tabs`
+        }),
+        PropertyPaneToggle(`${prefix}UseCustomColors`, {
+          label: 'Eigene Farben verwenden',
+          onText: 'Eigene Farben',
+          offText: 'SharePoint-Design'
+        }),
+        PropertyFieldColorPicker(`${prefix}BackgroundColor`, {
+          label: 'Hintergrundfarbe',
+          selectedColor: (props[`${prefix}BackgroundColor`] as string) || '#0078D4',
+          onPropertyChange: this.onPropertyPaneFieldChanged,
+          properties: this.properties,
+          disableAlpha: true,
+          disabled: !useCustomColors,
+          key: `${prefix}BackgroundColorFieldId`
+        } as any),
+        PropertyFieldColorPicker(`${prefix}TextColor`, {
+          label: 'Textfarbe',
+          selectedColor: (props[`${prefix}TextColor`] as string) || '#FFFFFF',
+          onPropertyChange: this.onPropertyPaneFieldChanged,
+          properties: this.properties,
+          disableAlpha: true,
+          disabled: !useCustomColors,
+          key: `${prefix}TextColorFieldId`
+        } as any),
+        PropertyPaneDropdown(`${prefix}IconType`, {
+          label: 'Symbol',
+          options: [
+            { key: 'none', text: 'Kein Symbol' },
+            { key: 'icon', text: 'Symbol-Bibliothek' },
+            { key: 'image', text: 'Eigenes Bild' }
+          ],
+          selectedKey: iconType
+        }),
+        PropertyFieldIconPicker(`${prefix}IconName`, {
+          label: 'Symbol auswählen',
+          currentIcon: (props[`${prefix}IconName`] as string) || '',
+          key: `${prefix}IconNameFieldId`,
+          onSave: (iconName: string) => {
+            (this.properties as unknown as { [key: string]: unknown })[`${prefix}IconName`] = iconName;
+            this.render();
+          },
+          properties: this.properties,
+          disabled: iconType !== 'icon',
+          onPropertyChange: this.onPropertyPaneFieldChanged,
+          buttonLabel: 'Symbol auswählen',
+          renderOption: 'panel'
+        } as any),
+        PropertyFieldFilePicker(`${prefix}IconUrl`, filePickerProps as any)
       ]
     };
   }

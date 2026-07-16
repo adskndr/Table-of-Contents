@@ -59,6 +59,12 @@
   .chipIcon {
     flex: 0 0 auto;
   }
+  .chipIconImage {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+  }
 
   // Tiles layout
   .tilesContainer {
@@ -67,6 +73,15 @@
     gap: 10px;
     list-style: none;
     padding: 0;
+  }
+  // Nested tile group (H2 inside H1, H3 inside H2, H4 inside H3)
+  .tilesContainerNested {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    list-style: none;
+    margin: 8px 0 0 0;
+    padding-left: 16px;
   }
   .tile {
     display: flex;
@@ -83,6 +98,14 @@
   .tabsContainer {
     display: flex;
     flex-direction: column;
+  }
+  // Nested tab group (H2 tabs inside H1's panel, etc.)
+  .tabsContainerNested {
+    display: flex;
+    flex-direction: column;
+    margin-top: 10px;
+    padding-left: 12px;
+    border-left: 2px solid var(--neutralLighter);
   }
   .tabHeaders {
     display: flex;
