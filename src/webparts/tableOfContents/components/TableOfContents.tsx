@@ -35,12 +35,13 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
    * Create a state for the history count. 
    * This is required to make sure we go back to the correct page when the back to previous page link is clicked.
    */
-  constructor(props: ITableOfContentsProps) {
-    super(props);
-    this.state = {
-      historyCount: -1
-    };
-  }
+	constructor(props: ITableOfContentsProps) {
+	  super(props);
+	  this.state = {
+		historyCount: -1,
+		activeTabIndex: 0
+	  };
+	}
 
   /**
    * Gets a nested list of links based on the list of headers specified.
@@ -288,52 +289,125 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
       target.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
     };
   }
+	/**
+	 * Extracts the display text for a link, falling back to the Permalink title if empty.
+	 */
+	private getLinkText(link: Link): string {
+	  let linkText = link.element.innerText;
+	  const regex = /title="Permalink for ([^"]+)"/;
 
+	  if (linkText === "") {
+		if (link.element.firstElementChild.getAttribute('role') === 'link') {
+		  const match = link.element.innerHTML.match(regex);
+		  if (match && match.length >= 2) {
+			linkText = match[1];
+		  } else {
+			linkText = 'Error!';
+		  }
+		} else {
+		  linkText = 'Error!';
+		}
+	  }
+
+	  return linkText;
+	}
   /**
    * Creates a list of components to display from a list of links.
    * @param links
    */
-  private renderLinks(links: Link[], listStyle: string): JSX.Element[] {
-    // For each link render a <li> element with a link. If the link has got childNodes, additionaly render <ul> with child links.
-    const elements = links.map((link, index) => {
-      let linkText = link.element.innerText;
-      const regex = /title="Permalink for ([^"]+)"/;
+	  private renderLinks(links: Link[], listStyle: string): JSX.Element[] {
+	  const elements = links.map((link, index) => {
+		const linkText = this.getLinkText(link);
+		const customFontSize = this.props.fontSize || '15px';
 
-      // If linkText is empty, extract the text from the 'Permalink'
-      if (linkText === "") {
-        if (link.element.firstElementChild.getAttribute('role') === 'link') {
-          let match = link.element.innerHTML.match(regex);
-          if (match.length >= 2) {
-            linkText = match[1];
-          }
-          else {
-            linkText = 'Error!';
-          }
-        }
-        else {
-          linkText = 'Error!';
-        }
-      }
+		return (
+		  <li key={index} style={{ fontSize: customFontSize }}>
+			
+			  onClick={this.scrollToHeader(link.element)}
+			  href={'#' + link.element.id}
+			  style={{ fontSize: customFontSize }}
+			>
+			  {linkText}
+			</a>
+			{link.childNodes.length > 0 ? (<ul style={{ listStyleType: listStyle }}>{this.renderLinks(link.childNodes, listStyle)}</ul>) : ''}
+		  </li>
+		);
+	  });
 
-      // Hier wird die Schriftgröße aus den Props ausgelesen
-      const customFontSize = this.props.fontSize || '15px';
+	  return elements;
+	}
+		/**
+	 * Renders top-level headers as a grid of clickable tiles/cards.
+	 */
+  private renderTiles(links: Link[], listStyle: string): JSX.Element {
+	  return (
+		<div className={styles.tilesContainer}>
+		  {links.map((link, index) => {
+			const linkText = this.getLinkText(link);
+			const customFontSize = this.props.fontSize || '15px';
 
-      return (
-        <li key={index} style={{ fontSize: customFontSize }}>
-          <a 
-            onClick={this.scrollToHeader(link.element)} 
-            href={'#' + link.element.id}
-            style={{ fontSize: customFontSize }} // Übernimmt die Schriftgröße direkt für den Link
-          >
-            {linkText}
-          </a>
-          {link.childNodes.length > 0 ? (<ul style={{ listStyleType: listStyle }}>{this.renderLinks(link.childNodes, listStyle)}</ul>) : ''}
-        </li>
-      );
-    });
+			return (
+			  <div className={styles.tile} key={index} style={{ fontSize: customFontSize }}>
+				
+				  className={styles.tileLink}
+				  onClick={this.scrollToHeader(link.element)}
+				  href={'#' + link.element.id}
+				  style={{ fontSize: customFontSize }}
+				>
+				  {linkText}
+				</a>
+				{link.childNodes.length > 0 ? (
+				  <ul style={{ listStyleType: listStyle }} className={styles.tileChildList}>
+					{this.renderLinks(link.childNodes, listStyle)}
+				  </ul>
+				) : ''}
+			  </div>
+			);
+		  })}
+		</div>
+	  );
+	}
 
-    return elements;
-  }
+	/**
+	 * Renders top-level headers as tabs; clicking a tab shows its child headers and scrolls to it.
+	 */
+	private renderTabs(links: Link[], listStyle: string): JSX.Element {
+	  const activeIndex = this.state.activeTabIndex || 0;
+
+	  return (
+		<div className={styles.tabsContainer}>
+		  <div className={styles.tabHeaders} role="tablist">
+			{links.map((link, index) => {
+			  const linkText = this.getLinkText(link);
+			  const isActive = index === activeIndex;
+
+			  return (
+				<button
+				  key={index}
+				  type="button"
+				  role="tab"
+				  aria-selected={isActive}
+				  className={isActive ? `${styles.tabHeader} ${styles.tabHeaderActive}` : styles.tabHeader}
+				  onClick={(event) => {
+					this.setState({ activeTabIndex: index });
+					this.scrollToHeader(link.element)(event);
+				  }}
+				>
+				  {linkText}
+				</button>
+			  );
+			})}
+		  </div>
+		  <div className={styles.tabPanel} role="tabpanel">
+			{links[activeIndex] && links[activeIndex].childNodes.length > 0 ? (
+			  <ul style={{ listStyleType: listStyle }}>
+				{this.renderLinks(links[activeIndex].childNodes, listStyle)}
+			  </ul>
+			) : null}
+		  </div>
+		</div>
+	  );
+	}
 
   /**
    * Force the component to re-render with a specified interval.
@@ -406,7 +480,23 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     // create a list of links from headers
     const links = this.getLinks(headers);
     // create components from a list of links
-    const toc = (<ul style={{ listStyleType: listStyle }}>{this.renderLinks(links, listStyle)}</ul>);
+    // alt:
+	// const toc = (<ul style={{ listStyleType: listStyle }}>{this.renderLinks(links, listStyle)}</ul>);
+
+	// neu:
+	let toc: JSX.Element;
+	switch (this.props.layoutMode) {
+	  case 'tiles':
+		toc = this.renderTiles(links, listStyle);
+		break;
+	  case 'tabs':
+		toc = this.renderTabs(links, listStyle);
+		break;
+	  case 'list':
+	  default:
+		toc = (<ul style={{ listStyleType: listStyle }}>{this.renderLinks(links, listStyle)}</ul>);
+		break;
+	}
     // create previous page link
     const previousPageTitle = this.props.showPreviousPageLinkTitle && !this.props.hideTitle ? (this.renderBackToPreviousLink(listStyle)) : null;
     const previousPageAbove = this.props.showPreviousPageLinkAbove ? (this.renderBackToPreviousLink(listStyle)) : null;
