@@ -1,5 +1,3 @@
-import { IReadonlyTheme } from '@microsoft/sp-component-base';
-
 /**
  * Styling configuration for one heading level (H1-H4) used by the "tiles" and "cards" layouts.
  */
@@ -22,8 +20,6 @@ export interface ILevelStyle {
 }
 
 export interface ITableOfContentsProps {
-  themeVariant: IReadonlyTheme | undefined;
-
   hideTitle: boolean;
   titleText: string;
   fontSize: string;

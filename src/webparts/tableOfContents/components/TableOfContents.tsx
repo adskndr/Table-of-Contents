@@ -66,20 +66,15 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
    * If the level is configured to use custom colors, those are applied directly.
    * Otherwise the chip follows the SharePoint page theme (via the CSS custom properties set from the site theme).
    */
-  private getChipStyle(levelStyle: ILevelStyle, isActive: boolean, fontSize: string): React.CSSProperties {
+  private getChipStyle(levelStyle: ILevelStyle, fontSize: string): React.CSSProperties {
     if (levelStyle.useCustomColors) {
       const bgColor = levelStyle.backgroundColor || TableOfContents.defaultLevelStyle.backgroundColor;
       const textColor = levelStyle.textColor || TableOfContents.defaultLevelStyle.textColor;
-
-      return isActive
-        ? { fontSize, backgroundColor: bgColor, color: textColor }
-        : { fontSize, backgroundColor: 'transparent', color: bgColor, borderColor: bgColor };
+      return { fontSize, backgroundColor: bgColor, color: textColor };
     }
 
     // "SharePoint design": rely on the theme CSS variables set by the webpart from the current site theme.
-    return isActive
-      ? { fontSize, backgroundColor: 'var(--primaryButtonBackground)', color: 'var(--primaryButtonText)' }
-      : { fontSize, backgroundColor: 'transparent', color: 'var(--themePrimary)', borderColor: 'var(--themePrimary)' };
+    return { fontSize, backgroundColor: 'var(--primaryButtonBackground)', color: 'var(--primaryButtonText)' };
   }
 
   /**
@@ -383,7 +378,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
       const linkText = this.getLinkText(link);
 
       // Hier wird die Schriftgröße aus den Props ausgelesen
-      const customFontSize = this.props.fontSize || '15px';
+      const customFontSize = this.props.fontSize || '18px';
 
       return (
         <li key={index} style={{ fontSize: customFontSize }}>
@@ -415,8 +410,8 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     }
 
     const levelStyle = this.getLevelStyle(depth);
-    const customFontSize = this.props.fontSize || '15px';
-    const chipStyle = this.getChipStyle(levelStyle, true, customFontSize);
+    const customFontSize = this.props.fontSize || '18px';
+    const chipStyle = this.getChipStyle(levelStyle, customFontSize);
     const containerClass = depth === 0 ? styles.tilesContainer : styles.tilesContainerNested;
 
     return (
@@ -507,15 +502,14 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   }
 
   /**
-   * Computes the full colour set for a card at a given level: background, text, icon-box,
-   * badge and divider colours - all as one consistent, always-legible pair.
+   * Computes the full colour set for a card at a given level: background, text, badge and
+   * divider colours - all as one consistent, always-legible pair.
    *
    * Uses the exact same background/text colors as the Kacheln chips - either the level's
    * custom colors, or (if not customized) the same theme token pair the chips already use.
    */
   private getCardChrome(levelStyle: ILevelStyle): {
     cardStyle: React.CSSProperties;
-    iconBoxStyle: React.CSSProperties;
     badgeStyle: React.CSSProperties;
     dividerStyle: React.CSSProperties;
   } {
@@ -528,7 +522,6 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
 
     return {
       cardStyle: { backgroundColor: bg, color: text, borderLeftColor: bg },
-      iconBoxStyle: { backgroundColor: 'rgba(255, 255, 255, 0.2)', color: text },
       badgeStyle: { backgroundColor: 'rgba(255, 255, 255, 0.25)', color: text },
       dividerStyle: { borderTopColor: 'rgba(255, 255, 255, 0.3)' }
     };
@@ -552,6 +545,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     const isTopLevel = depth === 0;
     const containerClass = isTopLevel ? styles.cardsGrid : styles.cardsNestedGroup;
     const chrome = this.getCardChrome(levelStyle);
+    const customFontSize = this.props.fontSize || '18px';
 
     return (
       <div className={containerClass}>
@@ -574,12 +568,8 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
                 href={'#' + link.element.id}
                 onClick={this.scrollToHeader(link.element)}
               >
-                {icon ? (
-                  <span className={styles.cardIconBox} style={chrome.iconBoxStyle}>
-                    {icon}
-                  </span>
-                ) : null}
-                <span className={styles.cardTitle}>{linkText}</span>
+                {icon ? <span className={styles.cardIcon}>{icon}</span> : null}
+                <span className={styles.cardTitle} style={{ fontSize: customFontSize }}>{linkText}</span>
                 {descendantCount > 0 ? <span className={styles.cardBadge} style={chrome.badgeStyle}>{descendantCount}</span> : null}
                 {hasChildren ? (
                   <button

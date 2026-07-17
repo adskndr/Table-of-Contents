@@ -88,11 +88,6 @@
     flex-direction: column;
     align-items: flex-start;
   }
-  .tileChildList {
-    margin: 6px 0 0 0;
-    padding-left: 16px;
-    font-size: 0.9em;
-  }
 
   // Cards layout
   .cardsGrid {
@@ -134,11 +129,8 @@
       color: inherit !important;
     }
   }
-  .cardIconBox {
+  .cardIcon {
     flex: 0 0 auto;
-    width: 28px;
-    height: 28px;
-    border-radius: var(--effect-roundedCorner4, 6px);
     display: flex;
     align-items: center;
     justify-content: center;

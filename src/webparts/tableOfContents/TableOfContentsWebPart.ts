@@ -25,19 +25,6 @@ import * as strings from 'TableOfContentsWebPartStrings';
 import TableOfContents from './components/TableOfContents';
 import { ITableOfContentsProps, ILevelStyle } from './components/ITableOfContentsProps';
 
-/**
- * Flat (property-pane friendly) representation of one heading level's style, stored directly
- * on the webpart properties as h1..., h2..., h3..., h4... prefixed fields.
- */
-interface ILevelStyleProps {
-  useCustomColors: boolean;
-  backgroundColor: string;
-  textColor: string;
-  iconType: 'none' | 'icon' | 'image';
-  iconName?: string;
-  iconUrl?: string;
-}
-
 export interface ITableOfContentsWebPartProps {
   hideTitle: boolean;
   titleText: string;
@@ -143,7 +130,7 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
   private getLevelStyles(): ILevelStyle[] {
     const props = this.properties as unknown as { [key: string]: unknown };
     return [1, 2, 3, 4].map((level) => {
-      const style: ILevelStyleProps = {
+      const style: ILevelStyle = {
         useCustomColors: !!props[`h${level}UseCustomColors`],
         backgroundColor: (props[`h${level}BackgroundColor`] as string) || '#0078D4',
         textColor: (props[`h${level}TextColor`] as string) || '#FFFFFF',
@@ -187,11 +174,9 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
     const element: React.ReactElement<ITableOfContentsProps> = React.createElement(
       TableOfContents,
       {
-        themeVariant: this._themeVariant,
-
         hideTitle: this.properties.hideTitle,
         titleText: this.properties.titleText,
-		fontSize: this.properties.fontSize || '15px',
+        fontSize: this.properties.fontSize || '18px',
 
         searchText: this.properties.searchText,
         searchMarkdown: this.properties.searchMarkdown,
@@ -377,15 +362,15 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
                 })
               ]
             },
-			{
-			  groupFields: [
+            {
+              groupFields: [
                 PropertyPaneTextField('fontSize', {
-				  label: 'Schriftgröße (z. B. 16px, 14px oder 1.2rem)',
-				  description: 'Gib die gewünschte Größe mit Einheit an.',
-				  value: '15px' // Standardwert, falls nichts eingegeben wurde
-				})
+                  label: 'Schriftgröße (z. B. 16px, 14px oder 1.2rem)',
+                  description: 'Gib die gewünschte Größe mit Einheit an.',
+                  value: '18px' // Standardwert, falls nichts eingegeben wurde
+                })
               ]
-			}
+            }
           ]
         }
       ]
