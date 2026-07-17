@@ -58,8 +58,6 @@ export interface ITableOfContentsWebPartProps {
   listStyle: string;
   fontSize: string;
   layoutMode: string;
-  allowCardReordering: boolean;
-  excludeSelectors: string;
 
   h1UseCustomColors: boolean;
   h1BackgroundColor: string;
@@ -110,9 +108,6 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
       }
       if (this.properties.layoutMode === undefined) {
         this.properties.layoutMode = 'list';
-      }
-      if (this.properties.allowCardReordering === undefined) {
-        this.properties.allowCardReordering = true;
       }
       // Default styling for each level: follow the SharePoint design (no custom colors, no icon)
       // until the user explicitly opts in to custom colors/icons for that level.
@@ -221,8 +216,6 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
         isEditMode: this.displayMode == DisplayMode.Edit,
 
         layoutMode: this.properties.layoutMode || 'list',
-        allowCardReordering: this.properties.allowCardReordering !== false,
-        excludeSelectors: this.properties.excludeSelectors || '',
         levelStyles: this.getLevelStyles(),
       }
     );
@@ -341,17 +334,12 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
                   options: [
                     { key: 'list', text: 'Liste' },
                     { key: 'tiles', text: 'Kacheln' },
-                    { key: 'tabs', text: 'Tabs' },
                     { key: 'cards', text: 'Karten' }
                   ],
                   selectedKey: this.properties.layoutMode || 'list'
                 }),
                 PropertyPaneLabel('layoutModeDescription', {
-                  text: 'Bei Kacheln, Tabs und Karten werden Ebene 1 bis 4 (H1-H4) ineinander verschachtelt dargestellt.'
-                }),
-                PropertyPaneToggle('allowCardReordering', {
-                  label: 'Karten (Ebene 1) per Drag & Drop verschiebbar',
-                  disabled: this.properties.layoutMode !== 'cards'
+                  text: 'Bei Kacheln und Karten werden Ebene 1 bis 4 (H1-H4) ineinander verschachtelt dargestellt.'
                 })
               ]
             },
@@ -386,19 +374,6 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
                 }),
                 PropertyPaneToggle('hideInMobileView', {
                   label: strings.hideInMobileViewLabel
-                })
-              ]
-            },
-            {
-              groupFields: [
-                PropertyPaneLabel('excludeSelectorsLabel', {
-                  text: 'Bereiche ausschliessen'
-                }),
-                PropertyPaneTextField('excludeSelectors', {
-                  label: 'CSS-Selektor(en) (mehrere durch Komma trennen)',
-                  description: 'Überschriften innerhalb dieser Bereiche werden ignoriert - z. B. um Überschriften aus einem Organigramm- oder anderen Webpart auf derselben Seite auszuschliessen. ' +
-                    'Rechtsklick auf den betroffenen Bereich im Browser → "Untersuchen", dort die passende Klasse (z. B. ".orgChartWebPart") kopieren.',
-                  value: this.properties.excludeSelectors || ''
                 })
               ]
             },
@@ -449,7 +424,7 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
     return {
       groupFields: [
         PropertyPaneLabel(`${prefix}Label`, {
-          text: `Ebene ${level} (H${level}) - Kacheln/Tabs/Karten`
+          text: `Ebene ${level} (H${level}) - Kacheln/Karten`
         }),
         PropertyPaneToggle(`${prefix}UseCustomColors`, {
           label: 'Eigene Farben verwenden',

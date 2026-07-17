@@ -33,7 +33,7 @@
     display: none !important;
   }
 
-  // Shared chip style used by both Kacheln (tiles) and Tabs
+  // Shared chip style used by Kacheln (tiles)
   .tileChip {
     display: inline-flex;
     align-items: center;
@@ -94,29 +94,6 @@
     font-size: 0.9em;
   }
 
-  // Tabs layout
-  .tabsContainer {
-    display: flex;
-    flex-direction: column;
-  }
-  // Nested tab group (H2 tabs inside H1's panel, etc.)
-  .tabsContainerNested {
-    display: flex;
-    flex-direction: column;
-    margin-top: 10px;
-    padding-left: 12px;
-    border-left: 2px solid var(--neutralLighter);
-  }
-  .tabHeaders {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-  .tabPanel {
-    padding-left: 4px;
-  }
-
   // Cards layout
   .cardsGrid {
     display: grid;
@@ -126,7 +103,7 @@
   }
   // Card chrome (background/text/icon colours) is computed in JS via getCardChrome() and applied
   // as inline styles - either theme-paired tokens ("SharePoint design") or the level's custom
-  // colors, exactly like the Kacheln/Tabs chips. The rules below are layout-only; colors are
+  // colors, exactly like the Kacheln chips. The rules below are layout-only; colors are
   // deliberately NOT hardcoded here so the inline style (and thus the theme) always wins.
   .card {
     border-radius: var(--effect-roundedCorner6, 8px);
@@ -134,15 +111,9 @@
     box-shadow: var(--effect-elevation4, 0 1px 3px rgba(0, 0, 0, 0.08));
     padding: 14px 16px;
   }
-  .card[draggable="true"] {
-    cursor: grab;
-  }
-  .card[draggable="true"]:active {
-    cursor: grabbing;
-  }
   // Nested card groups (H2 inside H1, H3 inside H2, ...) are indented to stay visually
   // subordinate to their parent, but every card - regardless of depth - uses the same .card
-  // style above, so H1 through H4 all look identical (matching the Kacheln/Tabs approach).
+  // style above, so H1 through H4 all look identical (matching the Kacheln approach).
   .cardsNestedGroup {
     display: flex;
     flex-direction: column;
@@ -205,42 +176,5 @@
   .cardDivider {
     border-top: 1px solid var(--neutralLighter, #edebe9);
     margin: 10px 0;
-  }
-
-  // Drag handle + up/down move buttons for reordering top-level (H1) cards.
-  // Buttons are provided in addition to native HTML5 drag-and-drop because that API
-  // does not work on touch devices (tablets/phones) - the buttons always work.
-  .cardMoveControls {
-    display: flex;
-    align-items: center;
-    flex: 0 0 auto;
-  }
-  .cardMoveButton {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: inherit;
-    opacity: 0.75;
-    &:disabled {
-      opacity: 0.3;
-      cursor: default;
-    }
-  }
-  .cardDragHandle {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: inherit;
-    opacity: 0.5;
-    cursor: grab;
-    padding: 4px;
-    &:active {
-      cursor: grabbing;
-    }
   }
 }

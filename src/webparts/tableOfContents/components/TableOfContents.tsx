@@ -27,18 +27,11 @@ interface Link {
 export default class TableOfContents extends React.Component<ITableOfContentsProps, ITableOfContentsState> {
   private static timeout = 500;
 
-  /** Transient (non-state) index of the H1 card currently being dragged, cleared once the drag ends. */
-  private dragSourceIndex: number | undefined = undefined;
-
   private static h2Tag = "h2";
   private static h3Tag = "h3";
   private static h4Tag = "h4";
   private static h5Tag = "h5";
 
-  /**
-   * Create a state for the history count.
-   * This is required to make sure we go back to the correct page when the back to previous page link is clicked.
-   */
   /**
    * Fallback style used for a level if the property pane hasn't provided one yet (e.g. older saved webpart instances).
    */
@@ -53,9 +46,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     super(props);
     this.state = {
       historyCount: -1,
-      activeTabPath: {},
-      expandedPaths: {},
-      cardOrderKeys: []
+      expandedPaths: {}
     };
   }
 
@@ -71,7 +62,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   }
 
   /**
-   * Computes the inline style for a tile/tab chip at a given level.
+   * Computes the inline style for a tile chip at a given level.
    * If the level is configured to use custom colors, those are applied directly.
    * Otherwise the chip follows the SharePoint page theme (via the CSS custom properties set from the site theme).
    */
@@ -342,34 +333,6 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   }
 
   /**
-   * Filters out headers that sit inside an element matching one of the admin-configured "exclude"
-   * CSS selectors (property pane field "excludeSelectors", comma-separated). Useful to keep headings
-   * that live inside another webpart on the page - e.g. an org chart webpart that renders its own
-   * headings for node captions - out of this table of contents.
-   * @param element
-   */
-  private filterExcludedSelectors = (element: HTMLElement): boolean => {
-    const raw = this.props.excludeSelectors;
-    if (!raw) {
-      return true;
-    }
-
-    const selectors = raw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
-
-    for (const selector of selectors) {
-      try {
-        if (element.closest(selector)) {
-          return false;
-        }
-      } catch (e) {
-        // Invalid selector entered by the admin - ignore it rather than breaking the whole ToC.
-      }
-    }
-
-    return true;
-  }
-
-  /**
    * Returns a click handler that scrolls a page to the specified element.
    */
   private scrollToHeader = (target: HTMLElement) => {
@@ -481,147 +444,15 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   }
 
   /**
-   * Handles a click on a tab header: switches the active tab for the given nested tab group and scrolls to the header.
-   * @param path identifies which nested tab group this click belongs to (see ITableOfContentsState.activeTabPath)
-   * @param index index of the clicked tab within that group
-   * @param target header element to scroll to
-   */
-  private handleTabClick = (path: string, index: number, target: HTMLElement) => {
-    return (event: React.SyntheticEvent) => {
-      this.setState((prevState) => ({
-        activeTabPath: { ...prevState.activeTabPath, [path]: index }
-      }));
-      this.scrollToHeader(target)(event);
-    };
-  }
-
-  /**
-   * Renders headers as rounded, coloured chip tabs, nested recursively so that H1 > H2 > H3 > H4 each
-   * appear as their own tab bar inside the panel of their parent tab. Each nesting level remembers its
-   * own active tab independently (see activeTabPath in the component state).
-   * @param links
-   * @param listStyle
-   * @param depth nesting depth: 0 = Level 1 (H1), 1 = Level 2 (H2), 2 = Level 3 (H3), 3 = Level 4 (H4)
-   * @param path identifies this tab group's position in the hierarchy, used as a key into activeTabPath
-   */
-  private renderTabs(links: Link[], listStyle: string, depth: number = 0, path: string = 'root'): JSX.Element {
-    if (!links || links.length === 0) {
-      return depth === 0 ? <div className={styles.tabsContainer} /> : null;
-    }
-
-    const levelStyle = this.getLevelStyle(depth);
-    const customFontSize = this.props.fontSize || '15px';
-    const activeIndex = this.state.activeTabPath[path] || 0;
-    const activeLink = links[activeIndex];
-    const containerClass = depth === 0 ? styles.tabsContainer : styles.tabsContainerNested;
-
-    return (
-      <div className={containerClass}>
-        <div className={styles.tabHeaders} role="tablist">
-          {links.map((link, index) => {
-            const linkText = this.getLinkText(link);
-            const isActive = index === activeIndex;
-            const chipStyle = this.getChipStyle(levelStyle, isActive, customFontSize);
-
-            return (
-              <button
-                key={index}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                className={styles.tileChip}
-                style={chipStyle}
-                onClick={this.handleTabClick(path, index, link.element)}
-              >
-                {this.renderLevelIcon(levelStyle)}
-                <span>{linkText}</span>
-              </button>
-            );
-          })}
-        </div>
-        <div className={styles.tabPanel} role="tabpanel">
-          {activeLink && activeLink.childNodes.length > 0
-            ? this.renderTabs(activeLink.childNodes, listStyle, depth + 1, path + '-' + activeIndex)
-            : null}
-        </div>
-      </div>
-    );
-  }
-
-  /**
    * Force the component to re-render with a specified interval.
    * This is needed to get valid id values for headers to use in links. Right after the rendering headers won't have valid ids, they are assigned later once the whole page got rendered.
    * The component will display the correct list of headers on the first render and will be able to process clicks (as a link to an HTMLElement is stored by the component).
    * Once valid ids got assigned to headers by SharePoint code, the component will get valid ids for headers. This way a link from ToC can be copied by a user and it will be a valid link to a header.
    */
   public componentDidMount() {
-    this.loadCardOrder();
     setInterval(() => {
       this.setState({});
     }, TableOfContents.timeout);
-  }
-
-  /**
-   * Returns the localStorage key used to persist the H1 card order for this webpart instance on this page.
-   */
-  private getCardOrderStorageKey(): string {
-    return `tocCardOrder_${this.props.webpartId}_${document.location.pathname}`;
-  }
-
-  /**
-   * Loads a previously saved custom H1 card order (if any) from localStorage.
-   */
-  private loadCardOrder(): void {
-    try {
-      const raw = window.localStorage.getItem(this.getCardOrderStorageKey());
-      if (raw) {
-        const cardOrderKeys = JSON.parse(raw) as string[];
-        this.setState({ cardOrderKeys });
-      }
-    } catch (e) {
-      // localStorage unavailable or corrupt data - fall back to natural page order.
-    }
-  }
-
-  /**
-   * Saves the current custom H1 card order to localStorage so it persists across visits (per browser).
-   */
-  private persistCardOrder(cardOrderKeys: string[]): void {
-    try {
-      window.localStorage.setItem(this.getCardOrderStorageKey(), JSON.stringify(cardOrderKeys));
-    } catch (e) {
-      // Ignore storage errors (e.g. private browsing quota).
-    }
-  }
-
-  /**
-   * Returns a stable key identifying a top-level link for reordering purposes.
-   */
-  private getLinkKey(link: Link): string {
-    return this.getLinkText(link);
-  }
-
-  /**
-   * Re-orders top-level links according to the persisted custom order, if any.
-   * Unknown links (new headers not seen before) keep their natural relative order and are appended at the end.
-   */
-  private getOrderedLinks(links: Link[]): Link[] {
-    const order = this.state.cardOrderKeys;
-    if (!order || order.length === 0) {
-      return links;
-    }
-    const indexOf = (link: Link): number => {
-      const idx = order.indexOf(this.getLinkKey(link));
-      return idx === -1 ? Infinity : idx;
-    };
-    // Stable sort: links with an unknown key keep their original relative order at the end.
-    return links
-      .map((link, originalIndex) => ({ link, originalIndex }))
-      .sort((a, b) => {
-        const diff = indexOf(a.link) - indexOf(b.link);
-        return diff !== 0 ? diff : a.originalIndex - b.originalIndex;
-      })
-      .map((entry) => entry.link);
   }
 
   /**
@@ -658,96 +489,6 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   }
 
   /**
-   * Drag-and-drop handlers for reordering top-level (H1) cards. Only used when depth === 0
-   * and this.props.allowCardReordering is true.
-   */
-  private handleCardDragStart = (index: number) => {
-    return (event: React.DragEvent<HTMLDivElement>) => {
-      this.dragSourceIndex = index;
-      event.dataTransfer.effectAllowed = 'move';
-    };
-  }
-
-  private handleCardDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-  }
-
-  private handleCardDrop = (targetIndex: number, orderedLinks: Link[]) => {
-    return (event: React.DragEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      const sourceIndex = this.dragSourceIndex;
-      this.dragSourceIndex = undefined;
-
-      if (sourceIndex === undefined || sourceIndex === targetIndex) {
-        return;
-      }
-
-      const reordered = orderedLinks.slice();
-      const [moved] = reordered.splice(sourceIndex, 1);
-      reordered.splice(targetIndex, 0, moved);
-
-      const cardOrderKeys = reordered.map((link) => this.getLinkKey(link));
-      this.setState({ cardOrderKeys });
-      this.persistCardOrder(cardOrderKeys);
-    };
-  }
-
-  /**
-   * Moves a top-level card up or down by one position. Provided as a touch- and keyboard-friendly
-   * alternative to native HTML5 drag-and-drop, which is not supported on touch devices.
-   * @param index current index of the card
-   * @param delta -1 to move up/left, +1 to move down/right
-   * @param orderedLinks the current (already ordered) list of top-level links
-   */
-  private moveCard = (index: number, delta: number, orderedLinks: Link[]) => {
-    return (event: React.SyntheticEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const targetIndex = index + delta;
-      if (targetIndex < 0 || targetIndex >= orderedLinks.length) {
-        return;
-      }
-
-      const reordered = orderedLinks.slice();
-      const [moved] = reordered.splice(index, 1);
-      reordered.splice(targetIndex, 0, moved);
-
-      const cardOrderKeys = reordered.map((link) => this.getLinkKey(link));
-      this.setState({ cardOrderKeys });
-      this.persistCardOrder(cardOrderKeys);
-    };
-  }
-
-  /**
-   * Small drag-handle glyph (six dots) shown on draggable top-level cards.
-   */
-  private renderDragHandle(): JSX.Element {
-    return (
-      <svg viewBox="0 0 16 16" width="12" height="16" aria-hidden="true" focusable="false">
-        <circle cx="5" cy="3" r="1.3" fill="currentColor" />
-        <circle cx="11" cy="3" r="1.3" fill="currentColor" />
-        <circle cx="5" cy="8" r="1.3" fill="currentColor" />
-        <circle cx="11" cy="8" r="1.3" fill="currentColor" />
-        <circle cx="5" cy="13" r="1.3" fill="currentColor" />
-        <circle cx="11" cy="13" r="1.3" fill="currentColor" />
-      </svg>
-    );
-  }
-
-  /**
-   * Small up/down chevron glyph used by the move-up/move-down buttons.
-   */
-  private renderMoveArrow(direction: 'up' | 'down'): JSX.Element {
-    const d = direction === 'up' ? 'M2 8l4-4 4 4' : 'M2 4l4 4 4-4';
-    return (
-      <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false">
-        <path d={d} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-
-  /**
    * Small chevron icon indicating expand/collapse state of a card.
    */
   private renderChevron(isExpanded: boolean): JSX.Element {
@@ -766,24 +507,11 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   }
 
   /**
-   * Renders headers as collapsible "cards" (icon, title, count badge, coloured accent bar), nested
-   * recursively so that H1 > H2 > H3 > H4 each appear as their own (smaller) card indented inside
-   * their parent's card - i.e. every level is its own card, but stays visually subordinate to its parent.
-   * Only the top-level (H1) cards can be freely reordered via drag-and-drop.
-   * @param links
-   * @param listStyle
-   * @param depth nesting depth: 0 = Level 1 (H1), 1 = Level 2 (H2), 2 = Level 3 (H3), 3 = Level 4 (H4)
-   * @param path identifies this card's position in the hierarchy, used as a key into expandedPaths
-   */
-  /**
    * Computes the full colour set for a card at a given level: background, text, icon-box,
    * badge and divider colours - all as one consistent, always-legible pair.
    *
-   * - If the level is set to "eigene Farben" (custom colors), the whole card is filled with the
-   *   chosen background/text colour (same behaviour as the coloured Kacheln/Tabs chips).
-   * - Otherwise ("SharePoint-Design"), every colour comes from the site theme, using the same
-   *   token pairs SharePoint itself uses for a neutral card surface - these are guaranteed by
-   *   the theme to always be legible together, in both light and dark site themes.
+   * Uses the exact same background/text colors as the Kacheln chips - either the level's
+   * custom colors, or (if not customized) the same theme token pair the chips already use.
    */
   private getCardChrome(levelStyle: ILevelStyle): {
     cardStyle: React.CSSProperties;
@@ -791,10 +519,6 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     badgeStyle: React.CSSProperties;
     dividerStyle: React.CSSProperties;
   } {
-    // Use the exact same background/text colors as the Kacheln/Tabs chips - either the level's
-    // custom colors, or (if not customized) the same theme token pair the chips already use.
-    // This guarantees identical, already-verified-working colors instead of a different set of
-    // "neutral surface" theme tokens that may not be reliably paired on every site theme.
     const bg = levelStyle.useCustomColors
       ? (levelStyle.backgroundColor || TableOfContents.defaultLevelStyle.backgroundColor)
       : 'var(--primaryButtonBackground)';
@@ -810,22 +534,28 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     };
   }
 
-
+  /**
+   * Renders headers as collapsible "cards" (icon, title, count badge, coloured accent), nested
+   * recursively so that H1 > H2 > H3 > H4 each appear as their own card indented inside their
+   * parent's card - i.e. every level is its own card, but stays visually subordinate to its parent.
+   * @param links
+   * @param listStyle
+   * @param depth nesting depth: 0 = Level 1 (H1), 1 = Level 2 (H2), 2 = Level 3 (H3), 3 = Level 4 (H4)
+   * @param path identifies this card's position in the hierarchy, used as a key into expandedPaths
+   */
   private renderCards(links: Link[], listStyle: string, depth: number = 0, path: string = 'root'): JSX.Element {
     if (!links || links.length === 0) {
       return depth === 0 ? <div className={styles.cardsGrid} /> : null;
     }
 
     const levelStyle = this.getLevelStyle(depth);
-    const orderedLinks = depth === 0 ? this.getOrderedLinks(links) : links;
     const isTopLevel = depth === 0;
-    const canDrag = isTopLevel && this.props.allowCardReordering;
     const containerClass = isTopLevel ? styles.cardsGrid : styles.cardsNestedGroup;
     const chrome = this.getCardChrome(levelStyle);
 
     return (
       <div className={containerClass}>
-        {orderedLinks.map((link, index) => {
+        {links.map((link, index) => {
           const linkText = this.getLinkText(link);
           const cardPath = `${path}-${index}`;
           const hasChildren = link.childNodes.length > 0;
@@ -838,22 +568,12 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
               className={styles.card}
               key={linkText + index}
               style={chrome.cardStyle}
-              draggable={canDrag}
-              onDragStart={canDrag ? this.handleCardDragStart(index) : undefined}
-              onDragOver={canDrag ? this.handleCardDragOver : undefined}
-              onDrop={canDrag ? this.handleCardDrop(index, orderedLinks) : undefined}
             >
               <a
                 className={styles.cardHeader}
                 href={'#' + link.element.id}
                 onClick={this.scrollToHeader(link.element)}
-                draggable={false}
               >
-                {canDrag ? (
-                  <span className={styles.cardDragHandle} aria-hidden="true">
-                    {this.renderDragHandle()}
-                  </span>
-                ) : null}
                 {icon ? (
                   <span className={styles.cardIconBox} style={chrome.iconBoxStyle}>
                     {icon}
@@ -861,28 +581,6 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
                 ) : null}
                 <span className={styles.cardTitle}>{linkText}</span>
                 {descendantCount > 0 ? <span className={styles.cardBadge} style={chrome.badgeStyle}>{descendantCount}</span> : null}
-                {canDrag ? (
-                  <span className={styles.cardMoveControls}>
-                    <button
-                      type="button"
-                      className={styles.cardMoveButton}
-                      aria-label="Nach oben verschieben"
-                      disabled={index === 0}
-                      onClick={this.moveCard(index, -1, orderedLinks)}
-                    >
-                      {this.renderMoveArrow('up')}
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.cardMoveButton}
-                      aria-label="Nach unten verschieben"
-                      disabled={index === orderedLinks.length - 1}
-                      onClick={this.moveCard(index, 1, orderedLinks)}
-                    >
-                      {this.renderMoveArrow('down')}
-                    </button>
-                  </span>
-                ) : null}
                 {hasChildren ? (
                   <button
                     type="button"
@@ -963,7 +661,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     // get headers, then filter out empty and headers from <aside> tags
     const listStyle = escape(this.props.listStyle) === "default" ? "" : this.props.listStyle;
     const querySelector = this.getQuerySelector(this.props);
-    const headers = this.getHtmlElements(querySelector).filter(this.filterEmpty).filter(this.filterAside).filter(this.filterTocIgnore).filter(this.filterStyleDisplayNone).filter(this.filterExcludedSelectors);
+    const headers = this.getHtmlElements(querySelector).filter(this.filterEmpty).filter(this.filterAside).filter(this.filterTocIgnore).filter(this.filterStyleDisplayNone);
     // create a list of links from headers
     const links = this.getLinks(headers);
 
@@ -972,9 +670,6 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     switch (this.props.layoutMode) {
       case 'tiles':
         toc = this.renderTiles(links, listStyle);
-        break;
-      case 'tabs':
-        toc = this.renderTabs(links, listStyle);
         break;
       case 'cards':
         toc = this.renderCards(links, listStyle);
