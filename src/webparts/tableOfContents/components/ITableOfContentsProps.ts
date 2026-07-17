@@ -48,6 +48,10 @@ export interface ITableOfContentsProps {
 
   layoutMode: string;
   /**
+   * Whether cards in the "cards" layout are expanded by default. Can still be toggled per card by the visitor.
+   */
+  cardsExpandedByDefault: boolean;
+  /**
    * Styling (colors + icon) for each heading level, index 0 = Level 1 (H1) ... index 3 = Level 4 (H4).
    */
   levelStyles: ILevelStyle[];

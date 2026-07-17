@@ -45,6 +45,7 @@ export interface ITableOfContentsWebPartProps {
   listStyle: string;
   fontSize: string;
   layoutMode: string;
+  cardsExpandedByDefault: boolean;
 
   h1UseCustomColors: boolean;
   h1BackgroundColor: string;
@@ -95,6 +96,9 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
       }
       if (this.properties.layoutMode === undefined) {
         this.properties.layoutMode = 'list';
+      }
+      if (this.properties.cardsExpandedByDefault === undefined) {
+        this.properties.cardsExpandedByDefault = true;
       }
       // Default styling for each level: follow the SharePoint design (no custom colors, no icon)
       // until the user explicitly opts in to custom colors/icons for that level.
@@ -201,6 +205,7 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
         isEditMode: this.displayMode == DisplayMode.Edit,
 
         layoutMode: this.properties.layoutMode || 'list',
+        cardsExpandedByDefault: this.properties.cardsExpandedByDefault !== false,
         levelStyles: this.getLevelStyles(),
       }
     );
@@ -322,6 +327,12 @@ export default class TableOfContentsWebPart extends BaseClientSideWebPart<ITable
                     { key: 'cards', text: 'Karten' }
                   ],
                   selectedKey: this.properties.layoutMode || 'list'
+                }),
+                PropertyPaneToggle('cardsExpandedByDefault', {
+                  label: 'Karten standardmässig ausgeklappt',
+                  onText: 'Ausgeklappt',
+                  offText: 'Eingeklappt',
+                  disabled: this.properties.layoutMode !== 'cards'
                 }),
                 PropertyPaneLabel('layoutModeDescription', {
                   text: 'Bei Kacheln und Karten werden Ebene 1 bis 4 (H1-H4) ineinander verschachtelt dargestellt.'

@@ -463,10 +463,15 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   }
 
   /**
-   * Whether the card at the given path is currently expanded. Defaults to expanded.
+   * Whether the card at the given path is currently expanded. Defaults to the configured
+   * "expanded by default" setting, unless the visitor has explicitly toggled this specific card.
    */
   private isCardExpanded(path: string): boolean {
-    return this.state.expandedPaths[path] !== false;
+    const explicitState = this.state.expandedPaths[path];
+    if (explicitState !== undefined) {
+      return explicitState;
+    }
+    return this.props.cardsExpandedByDefault !== false;
   }
 
   /**
