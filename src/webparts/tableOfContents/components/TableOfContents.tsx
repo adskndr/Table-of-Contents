@@ -1,9 +1,10 @@
 import * as React from 'react';
 import styles from './TableOfContents.module.scss';
-import { ITableOfContentsProps } from './ITableOfContentsProps';
+import { ITableOfContentsProps, ILevelStyle } from './ITableOfContentsProps';
 import { ITableOfContentsState } from './ITableOfContentsState';
 import { escape } from '@microsoft/sp-lodash-subset';
 import * as strings from "TableOfContentsWebPartStrings";
+import { Icon } from '@fluentui/react/lib/Icon';
 
 /**
  * Describes a link for a header
@@ -25,6 +26,13 @@ interface Link {
 
 export default class TableOfContents extends React.Component<ITableOfContentsProps, ITableOfContentsState> {
   private static timeout = 500;
+  /**
+   * How many times to poll for header id assignment while the page is in view (read-only) mode
+   * before giving up: 20 x 500ms = 10 seconds, comfortably longer than SharePoint normally takes
+   * to assign real ids to headers after initial render. In edit mode polling never stops, since
+   * the page author may add/remove/rename headings at any time.
+   */
+  private static maxViewModePollCount = 20;
 
   private static h2Tag = "h2";
   private static h3Tag = "h3";
@@ -32,14 +40,70 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   private static h5Tag = "h5";
 
   /**
-   * Create a state for the history count. 
-   * This is required to make sure we go back to the correct page when the back to previous page link is clicked.
+   * Fallback style used for a level if the property pane hasn't provided one yet (e.g. older saved webpart instances).
    */
+  private static defaultLevelStyle: ILevelStyle = {
+    useCustomColors: false,
+    backgroundColor: '#0078D4',
+    textColor: '#FFFFFF',
+    iconType: 'none'
+  };
+
+  private pollIntervalId: number | undefined;
+  private pollCount = 0;
+  /** Last sticky-related values actually written to the DOM, so configureSticky() can skip redundant style writes. */
+  private lastStickyState: string | undefined;
+
   constructor(props: ITableOfContentsProps) {
     super(props);
     this.state = {
-      historyCount: -1
+      historyCount: -1,
+      expandedPaths: {}
     };
+  }
+
+  /**
+   * Returns the style configuration (colors + icon) for a given nesting depth (0 = H1/Level 1, 1 = H2/Level 2, ...).
+   */
+  private getLevelStyle(depth: number): ILevelStyle {
+    const levelStyles = this.props.levelStyles;
+    if (levelStyles && levelStyles[depth]) {
+      return levelStyles[depth];
+    }
+    return TableOfContents.defaultLevelStyle;
+  }
+
+  /**
+   * Computes the inline style for a tile chip at a given level.
+   * If the level is configured to use custom colors, those are applied directly.
+   * Otherwise the chip follows the SharePoint page theme (via the CSS custom properties set from the site theme).
+   */
+  private getChipStyle(levelStyle: ILevelStyle, fontSize: string): React.CSSProperties {
+    if (levelStyle.useCustomColors) {
+      const bgColor = levelStyle.backgroundColor || TableOfContents.defaultLevelStyle.backgroundColor;
+      const textColor = levelStyle.textColor || TableOfContents.defaultLevelStyle.textColor;
+      return { fontSize, backgroundColor: bgColor, color: textColor };
+    }
+
+    // "SharePoint design": rely on the theme CSS variables set by the webpart from the current site theme.
+    return { fontSize, backgroundColor: 'var(--primaryButtonBackground)', color: 'var(--primaryButtonText)' };
+  }
+
+  /**
+   * Renders the icon for a chip at a given level: none, a Fluent UI icon (icon library), or a custom image.
+   * Falls back to the default decorative icon if no level style is configured at all.
+   */
+  private renderLevelIcon(levelStyle: ILevelStyle): JSX.Element | null {
+    if (!levelStyle || levelStyle.iconType === 'none') {
+      return null;
+    }
+    if (levelStyle.iconType === 'image' && levelStyle.iconUrl) {
+      return <img src={levelStyle.iconUrl} className={styles.chipIconImage} alt="" aria-hidden="true" />;
+    }
+    if (levelStyle.iconType === 'icon' && levelStyle.iconName) {
+      return <Icon iconName={levelStyle.iconName} className={styles.chipIcon} aria-hidden="true" />;
+    }
+    return null;
   }
 
   /**
@@ -290,40 +354,50 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   }
 
   /**
+   * Extracts the display text for a link, falling back to the Permalink title if empty.
+   * @param link
+   */
+  private getLinkText(link: Link): string {
+    let linkText = link.element.innerText;
+    const regex = /title="Permalink for ([^"]+)"/;
+
+    if (linkText === "") {
+      if (link.element.firstElementChild.getAttribute('role') === 'link') {
+        const match = link.element.innerHTML.match(regex);
+        if (match && match.length >= 2) {
+          linkText = match[1];
+        }
+        else {
+          linkText = 'Error!';
+        }
+      }
+      else {
+        linkText = 'Error!';
+      }
+    }
+
+    return linkText;
+  }
+
+
+  /**
    * Creates a list of components to display from a list of links.
    * @param links
    */
   private renderLinks(links: Link[], listStyle: string): JSX.Element[] {
     // For each link render a <li> element with a link. If the link has got childNodes, additionaly render <ul> with child links.
     const elements = links.map((link, index) => {
-      let linkText = link.element.innerText;
-      const regex = /title="Permalink for ([^"]+)"/;
-
-      // If linkText is empty, extract the text from the 'Permalink'
-      if (linkText === "") {
-        if (link.element.firstElementChild.getAttribute('role') === 'link') {
-          let match = link.element.innerHTML.match(regex);
-          if (match.length >= 2) {
-            linkText = match[1];
-          }
-          else {
-            linkText = 'Error!';
-          }
-        }
-        else {
-          linkText = 'Error!';
-        }
-      }
+      const linkText = this.getLinkText(link);
 
       // Hier wird die Schriftgröße aus den Props ausgelesen
-      const customFontSize = this.props.fontSize || '15px';
+      const customFontSize = this.props.fontSize || '18px';
 
       return (
         <li key={index} style={{ fontSize: customFontSize }}>
-          <a 
-            onClick={this.scrollToHeader(link.element)} 
+          <a
+            onClick={this.scrollToHeader(link.element)}
             href={'#' + link.element.id}
-            style={{ fontSize: customFontSize }} // Übernimmt die Schriftgröße direkt für den Link
+            style={{ fontSize: customFontSize }}
           >
             {linkText}
           </a>
@@ -336,19 +410,239 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   }
 
   /**
+   * Renders headers as a grid of rounded, coloured chip tiles, nested recursively so that
+   * H1 > H2 > H3 > H4 each appear as their own tile group inside their parent tile.
+   * @param links
+   * @param listStyle
+   * @param depth nesting depth: 0 = Level 1 (H1), 1 = Level 2 (H2), 2 = Level 3 (H3), 3 = Level 4 (H4)
+   */
+  private renderTiles(links: Link[], listStyle: string, depth: number = 0): JSX.Element {
+    if (!links || links.length === 0) {
+      return depth === 0 ? <div className={styles.tilesContainer} /> : null;
+    }
+
+    const levelStyle = this.getLevelStyle(depth);
+    const customFontSize = this.props.fontSize || '18px';
+    const chipStyle = this.getChipStyle(levelStyle, customFontSize);
+    const containerClass = depth === 0 ? styles.tilesContainer : styles.tilesContainerNested;
+
+    return (
+      <div className={containerClass}>
+        {links.map((link, index) => {
+          const linkText = this.getLinkText(link);
+
+          return (
+            <div className={styles.tile} key={index}>
+              <a
+                className={styles.tileChip}
+                onClick={this.scrollToHeader(link.element)}
+                href={'#' + link.element.id}
+                style={chipStyle}
+              >
+                {this.renderLevelIcon(levelStyle)}
+                <span>{linkText}</span>
+              </a>
+              {link.childNodes.length > 0 ? this.renderTiles(link.childNodes, listStyle, depth + 1) : null}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  /**
    * Force the component to re-render with a specified interval.
    * This is needed to get valid id values for headers to use in links. Right after the rendering headers won't have valid ids, they are assigned later once the whole page got rendered.
    * The component will display the correct list of headers on the first render and will be able to process clicks (as a link to an HTMLElement is stored by the component).
    * Once valid ids got assigned to headers by SharePoint code, the component will get valid ids for headers. This way a link from ToC can be copied by a user and it will be a valid link to a header.
+   *
+   * In edit mode this polls indefinitely, since the page author may add/remove/rename headings at
+   * any time. In view mode it stops after maxViewModePollCount attempts - by then, header ids have
+   * long since been assigned and headings on a published page don't change, so continuing to poll
+   * forever would just re-scan the page and re-render for no reason.
    */
   public componentDidMount() {
-    setInterval(() => {
+    this.pollIntervalId = window.setInterval(() => {
+      if (!this.props.isEditMode) {
+        this.pollCount++;
+        if (this.pollCount >= TableOfContents.maxViewModePollCount) {
+          window.clearInterval(this.pollIntervalId);
+          this.pollIntervalId = undefined;
+        }
+      }
       this.setState({});
     }, TableOfContents.timeout);
+
+    // Sticky mode depends on window width (see configureSticky) - re-evaluate on resize so it still
+    // reacts correctly once the bounded view-mode polling above has stopped.
+    window.addEventListener('resize', this.handleWindowResize);
+  }
+
+  public componentWillUnmount() {
+    if (this.pollIntervalId !== undefined) {
+      window.clearInterval(this.pollIntervalId);
+      this.pollIntervalId = undefined;
+    }
+    window.removeEventListener('resize', this.handleWindowResize);
+  }
+
+  private handleWindowResize = () => {
+    this.setState({});
   }
 
   /**
-   * Event for the back to previous page link. 
+   * Counts every descendant link nested under the given link (children, grandchildren, ...).
+   * Used for the small count badge shown on a card (layout = "cards").
+   */
+  private countDescendants(link: Link): number {
+    let count = 0;
+    for (const child of link.childNodes) {
+      count += 1 + this.countDescendants(child);
+    }
+    return count;
+  }
+
+  /**
+   * Whether the card at the given path is currently expanded. Defaults to the configured
+   * "expanded by default" setting, unless the visitor has explicitly toggled this specific card.
+   */
+  private isCardExpanded(path: string): boolean {
+    const explicitState = this.state.expandedPaths[path];
+    if (explicitState !== undefined) {
+      return explicitState;
+    }
+    return this.props.cardsExpandedByDefault !== false;
+  }
+
+  /**
+   * Toggles expand/collapse for the card at the given path.
+   */
+  private toggleCardExpanded = (path: string) => {
+    return (event: React.SyntheticEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const isExpanded = this.isCardExpanded(path);
+      this.setState((prevState) => ({
+        expandedPaths: { ...prevState.expandedPaths, [path]: !isExpanded }
+      }));
+    };
+  }
+
+  /**
+   * Small chevron icon indicating expand/collapse state of a card.
+   */
+  private renderChevron(isExpanded: boolean): JSX.Element {
+    return (
+      <svg
+        className={isExpanded ? styles.cardChevronExpanded : styles.cardChevron}
+        viewBox="0 0 12 12"
+        width="12"
+        height="12"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  /**
+   * Computes the full colour set for a card at a given level: background, text, badge and
+   * divider colours - all as one consistent, always-legible pair.
+   *
+   * Uses the exact same background/text colors as the Kacheln chips - either the level's
+   * custom colors, or (if not customized) the same theme token pair the chips already use.
+   */
+  private getCardChrome(levelStyle: ILevelStyle): {
+    cardStyle: React.CSSProperties;
+    badgeStyle: React.CSSProperties;
+    dividerStyle: React.CSSProperties;
+  } {
+    const bg = levelStyle.useCustomColors
+      ? (levelStyle.backgroundColor || TableOfContents.defaultLevelStyle.backgroundColor)
+      : 'var(--primaryButtonBackground)';
+    const text = levelStyle.useCustomColors
+      ? (levelStyle.textColor || TableOfContents.defaultLevelStyle.textColor)
+      : 'var(--primaryButtonText)';
+
+    return {
+      cardStyle: { backgroundColor: bg, color: text, borderLeftColor: bg },
+      badgeStyle: { backgroundColor: 'rgba(255, 255, 255, 0.25)', color: text },
+      dividerStyle: { borderTopColor: 'rgba(255, 255, 255, 0.3)' }
+    };
+  }
+
+  /**
+   * Renders headers as collapsible "cards" (icon, title, count badge, coloured accent), nested
+   * recursively so that H1 > H2 > H3 > H4 each appear as their own card indented inside their
+   * parent's card - i.e. every level is its own card, but stays visually subordinate to its parent.
+   * @param links
+   * @param listStyle
+   * @param depth nesting depth: 0 = Level 1 (H1), 1 = Level 2 (H2), 2 = Level 3 (H3), 3 = Level 4 (H4)
+   * @param path identifies this card's position in the hierarchy, used as a key into expandedPaths
+   */
+  private renderCards(links: Link[], listStyle: string, depth: number = 0, path: string = 'root'): JSX.Element {
+    if (!links || links.length === 0) {
+      return depth === 0 ? <div className={styles.cardsGrid} /> : null;
+    }
+
+    const levelStyle = this.getLevelStyle(depth);
+    const isTopLevel = depth === 0;
+    const containerClass = isTopLevel ? styles.cardsGrid : styles.cardsNestedGroup;
+    const chrome = this.getCardChrome(levelStyle);
+    const customFontSize = this.props.fontSize || '18px';
+
+    return (
+      <div className={containerClass}>
+        {links.map((link, index) => {
+          const linkText = this.getLinkText(link);
+          const cardPath = `${path}-${index}`;
+          const hasChildren = link.childNodes.length > 0;
+          const expanded = this.isCardExpanded(cardPath);
+          const descendantCount = this.countDescendants(link);
+          const icon = this.renderLevelIcon(levelStyle);
+
+          return (
+            <div
+              className={styles.card}
+              key={linkText + index}
+              style={chrome.cardStyle}
+            >
+              <a
+                className={styles.cardHeader}
+                href={'#' + link.element.id}
+                onClick={this.scrollToHeader(link.element)}
+              >
+                {icon ? <span className={styles.cardIcon}>{icon}</span> : null}
+                <span className={styles.cardTitle} style={{ fontSize: customFontSize }}>{linkText}</span>
+                {descendantCount > 0 ? <span className={styles.cardBadge} style={chrome.badgeStyle}>{descendantCount}</span> : null}
+                {hasChildren ? (
+                  <button
+                    type="button"
+                    className={styles.cardToggle}
+                    aria-expanded={expanded}
+                    aria-label={expanded ? 'Zusammenklappen' : 'Ausklappen'}
+                    onClick={this.toggleCardExpanded(cardPath)}
+                  >
+                    {this.renderChevron(expanded)}
+                  </button>
+                ) : null}
+              </a>
+              {hasChildren && expanded ? (
+                <React.Fragment>
+                  <div className={styles.cardDivider} style={chrome.dividerStyle} />
+                  {this.renderCards(link.childNodes, listStyle, depth + 1, cardPath)}
+                </React.Fragment>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  /**
+   * Event for the back to previous page link.
    * It uses the history count to work out how many pages to go back, as each click to a header results in history
    */
   public backToPreviousPage() {
@@ -367,24 +661,31 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   /**
    * Modify the CSS of the appropriate HTML elements based on the wepart ID to enable sticky mode.
    * This does involve modifying HTML elements outside of the webpart, so may well break in the furture if Microsoft change their HTML\CSS etc.
+   * Skips the actual DOM writes (and the reflow they cause) if nothing sticky-relevant changed since
+   * the last render - this matters because render() runs frequently (e.g. every card expand/collapse,
+   * and periodically while polling for header ids), not just when sticky settings change.
    */
   private configureSticky() {
+    const isWide = window.innerWidth > 1024;
+    const stickyState = `${this.props.enableStickyMode}|${this.props.isEditMode}|${isWide}`;
+    if (stickyState === this.lastStickyState) {
+      return;
+    }
+    this.lastStickyState = stickyState;
 
     const HTMLElementSticky: HTMLElement = document.querySelector("[id='" + this.props.webpartId + "']");
     if (HTMLElementSticky != null) {
-      if (this.props.enableStickyMode && window.innerWidth > 1024) {
+      if (this.props.enableStickyMode && isWide) {
 
         if (this.props.isEditMode){
           HTMLElementSticky.parentElement.parentElement.style.position = "Sticky";
           HTMLElementSticky.parentElement.parentElement.style.top = "0px";
           HTMLElementSticky.parentElement.parentElement.parentElement.style.height = "100%";
-          console.log("Edit Mode");
         }
         else {
           HTMLElementSticky.style.position = "Sticky";
           HTMLElementSticky.style.top = "0px";
           HTMLElementSticky.parentElement.style.height = "100%";
-          console.log("Normal Mode");
         }
       }
       else {
@@ -405,8 +706,22 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     const headers = this.getHtmlElements(querySelector).filter(this.filterEmpty).filter(this.filterAside).filter(this.filterTocIgnore).filter(this.filterStyleDisplayNone);
     // create a list of links from headers
     const links = this.getLinks(headers);
-    // create components from a list of links
-    const toc = (<ul style={{ listStyleType: listStyle }}>{this.renderLinks(links, listStyle)}</ul>);
+
+    // create components from a list of links, depending on the selected layout mode
+    let toc: JSX.Element;
+    switch (this.props.layoutMode) {
+      case 'tiles':
+        toc = this.renderTiles(links, listStyle);
+        break;
+      case 'cards':
+        toc = this.renderCards(links, listStyle);
+        break;
+      case 'list':
+      default:
+        toc = (<ul style={{ listStyleType: listStyle }}>{this.renderLinks(links, listStyle)}</ul>);
+        break;
+    }
+
     // create previous page link
     const previousPageTitle = this.props.showPreviousPageLinkTitle && !this.props.hideTitle ? (this.renderBackToPreviousLink(listStyle)) : null;
     const previousPageAbove = this.props.showPreviousPageLinkAbove ? (this.renderBackToPreviousLink(listStyle)) : null;
