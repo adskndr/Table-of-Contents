@@ -22,10 +22,23 @@ interface Link {
    * Parent link. Undefined for the root link.
    */
   parent: Link | undefined;
+  /**
+   * Number of descendants (children, grandchildren, ...) nested under this link. Computed once
+   * when the tree is built (see getLinks/assignDescendantCounts) so the "cards" layout's count
+   * badge doesn't have to re-walk each subtree on every render.
+   */
+  descendantCount?: number;
 }
 
 export default class TableOfContents extends React.Component<ITableOfContentsProps, ITableOfContentsState> {
   private static timeout = 500;
+  /**
+   * How many times to poll for header id assignment while the page is in view (read-only) mode
+   * before giving up: 20 x 500ms = 10 seconds, comfortably longer than SharePoint normally takes
+   * to assign real ids to headers after initial render. In edit mode polling never stops, since
+   * the page author may add/remove/rename headings at any time.
+   */
+  private static maxViewModePollCount = 20;
 
   private static h2Tag = "h2";
   private static h3Tag = "h3";
@@ -41,6 +54,11 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     textColor: '#FFFFFF',
     iconType: 'none'
   };
+
+  private pollIntervalId: number | undefined;
+  private pollCount = 0;
+  /** Last sticky-related values actually written to the DOM, so configureSticky() can skip redundant style writes. */
+  private lastStickyState: string | undefined;
 
   constructor(props: ITableOfContentsProps) {
     super(props);
@@ -144,8 +162,30 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
       prevLink = link;
     }
 
+    // Compute each link's descendant count once, bottom-up, in a single O(n) pass over the whole
+    // tree - used by the "cards" layout's count badge. Doing this here (once per tree build) avoids
+    // re-walking each subtree from scratch for every card during rendering.
+    for (const link of root.childNodes) {
+      this.assignDescendantCount(link);
+    }
+
     // return list of links for top-level headers
     return root.childNodes;
+  }
+
+  /**
+   * Recursively computes and caches (on link.descendantCount) the number of descendants nested
+   * under the given link. Each node's count is derived from its already-computed children,
+   * so the whole tree is visited exactly once regardless of nesting depth.
+   * @param link
+   */
+  private assignDescendantCount(link: Link): number {
+    let count = 0;
+    for (const child of link.childNodes) {
+      count += 1 + this.assignDescendantCount(child);
+    }
+    link.descendantCount = count;
+    return count;
   }
 
   /**
@@ -259,72 +299,36 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   }
 
   /**
-   * Filters elements with empty text.
+   * Combined header filter: excludes headers that are empty, marked with 'data-toc-ignore', sit
+   * inside an <aside> tag, or sit inside an element styled with 'display: none'.
+   * Does a single walk up the parent chain (covering both the <aside> and 'display: none' checks
+   * together) instead of two separate walks, and checks the cheap, walk-free conditions first.
    * @param element
    */
-  private filterEmpty(element: HTMLElement): boolean {
-    // Check if element is empty. If it is in a collapsible section with a 'Premalink' then return true as we can fix that later.
-    if (element.innerText.trim() !== '') {
-      return true;
+  private filterHeader = (element: HTMLElement): boolean => {
+    if (element.getAttribute('data-toc-ignore')) {
+      return false;
     }
-    else if (element.firstElementChild !== null) {
-      if (element.firstElementChild.getAttribute('role') === 'link') {
-        return true;
-      }
-      else {
+
+    if (element.innerText.trim() === '') {
+      // Empty text is allowed only for a collapsible section with a 'Permalink' - we can fix that up later.
+      if (!element.firstElementChild || element.firstElementChild.getAttribute('role') !== 'link') {
         return false;
       }
     }
-  }
-
-  /**
-   * Filters elements that are inside <aside> tag and thus not related to a page.
-   * @param element
-   */
-  private filterAside(element: HTMLElement): boolean {
-    let inAsideTag = false;
 
     let parentElement = element.parentElement;
-
     while (parentElement) {
       if (parentElement.tagName.toLocaleLowerCase() === 'aside') {
-        inAsideTag = true;
-        break;
+        return false;
       }
-
-      parentElement = parentElement.parentElement;
-    }
-
-    return !inAsideTag;
-  }
-
-  /**
-   * Filters elements that have the data attrribute of 'data-toc-ignore' and thus should be ignored.
-   * @param element
-   */
-  private filterTocIgnore(element: HTMLElement): boolean {
-    return !(element.getAttribute("data-toc-ignore"));
-  }
-
-  /**
-   * Filters elements that have been set with a sytle of 'display: none'
-   * @param element
-   */
-  private filterStyleDisplayNone(element: HTMLElement): boolean {
-    let styleDisplayNone = false;
-
-    let parentElement = element.parentElement;
-
-    while (parentElement) {
       if (parentElement.style.display.toLocaleLowerCase() === 'none') {
-        styleDisplayNone = true;
-        break;
+        return false;
       }
-
       parentElement = parentElement.parentElement;
     }
 
-    return !styleDisplayNone;
+    return true;
   }
 
   /**
@@ -443,23 +447,39 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
    * This is needed to get valid id values for headers to use in links. Right after the rendering headers won't have valid ids, they are assigned later once the whole page got rendered.
    * The component will display the correct list of headers on the first render and will be able to process clicks (as a link to an HTMLElement is stored by the component).
    * Once valid ids got assigned to headers by SharePoint code, the component will get valid ids for headers. This way a link from ToC can be copied by a user and it will be a valid link to a header.
+   *
+   * In edit mode this polls indefinitely, since the page author may add/remove/rename headings at
+   * any time. In view mode it stops after maxViewModePollCount attempts - by then, header ids have
+   * long since been assigned and headings on a published page don't change, so continuing to poll
+   * forever would just re-scan the page and re-render for no reason.
    */
   public componentDidMount() {
-    setInterval(() => {
+    this.pollIntervalId = window.setInterval(() => {
+      if (!this.props.isEditMode) {
+        this.pollCount++;
+        if (this.pollCount >= TableOfContents.maxViewModePollCount) {
+          window.clearInterval(this.pollIntervalId);
+          this.pollIntervalId = undefined;
+        }
+      }
       this.setState({});
     }, TableOfContents.timeout);
+
+    // Sticky mode depends on window width (see configureSticky) - re-evaluate on resize so it still
+    // reacts correctly once the bounded view-mode polling above has stopped.
+    window.addEventListener('resize', this.handleWindowResize);
   }
 
-  /**
-   * Counts every descendant link nested under the given link (children, grandchildren, ...).
-   * Used for the small count badge shown on a card (layout = "cards").
-   */
-  private countDescendants(link: Link): number {
-    let count = 0;
-    for (const child of link.childNodes) {
-      count += 1 + this.countDescendants(child);
+  public componentWillUnmount() {
+    if (this.pollIntervalId !== undefined) {
+      window.clearInterval(this.pollIntervalId);
+      this.pollIntervalId = undefined;
     }
-    return count;
+    window.removeEventListener('resize', this.handleWindowResize);
+  }
+
+  private handleWindowResize = () => {
+    this.setState({});
   }
 
   /**
@@ -559,7 +579,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
           const cardPath = `${path}-${index}`;
           const hasChildren = link.childNodes.length > 0;
           const expanded = this.isCardExpanded(cardPath);
-          const descendantCount = this.countDescendants(link);
+          const descendantCount = link.descendantCount || 0;
           const icon = this.renderLevelIcon(levelStyle);
 
           return (
@@ -621,24 +641,31 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
   /**
    * Modify the CSS of the appropriate HTML elements based on the wepart ID to enable sticky mode.
    * This does involve modifying HTML elements outside of the webpart, so may well break in the furture if Microsoft change their HTML\CSS etc.
+   * Skips the actual DOM writes (and the reflow they cause) if nothing sticky-relevant changed since
+   * the last render - this matters because render() runs frequently (e.g. every card expand/collapse,
+   * and periodically while polling for header ids), not just when sticky settings change.
    */
   private configureSticky() {
+    const isWide = window.innerWidth > 1024;
+    const stickyState = `${this.props.enableStickyMode}|${this.props.isEditMode}|${isWide}`;
+    if (stickyState === this.lastStickyState) {
+      return;
+    }
+    this.lastStickyState = stickyState;
 
     const HTMLElementSticky: HTMLElement = document.querySelector("[id='" + this.props.webpartId + "']");
     if (HTMLElementSticky != null) {
-      if (this.props.enableStickyMode && window.innerWidth > 1024) {
+      if (this.props.enableStickyMode && isWide) {
 
         if (this.props.isEditMode){
           HTMLElementSticky.parentElement.parentElement.style.position = "Sticky";
           HTMLElementSticky.parentElement.parentElement.style.top = "0px";
           HTMLElementSticky.parentElement.parentElement.parentElement.style.height = "100%";
-          console.log("Edit Mode");
         }
         else {
           HTMLElementSticky.style.position = "Sticky";
           HTMLElementSticky.style.top = "0px";
           HTMLElementSticky.parentElement.style.height = "100%";
-          console.log("Normal Mode");
         }
       }
       else {
@@ -656,7 +683,7 @@ export default class TableOfContents extends React.Component<ITableOfContentsPro
     // get headers, then filter out empty and headers from <aside> tags
     const listStyle = escape(this.props.listStyle) === "default" ? "" : this.props.listStyle;
     const querySelector = this.getQuerySelector(this.props);
-    const headers = this.getHtmlElements(querySelector).filter(this.filterEmpty).filter(this.filterAside).filter(this.filterTocIgnore).filter(this.filterStyleDisplayNone);
+    const headers = this.getHtmlElements(querySelector).filter(this.filterHeader);
     // create a list of links from headers
     const links = this.getLinks(headers);
 
